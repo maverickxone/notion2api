@@ -1,9 +1,79 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-.env
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
 .venv/
-env/
 venv/
 ENV/
+env/
+.virtualenv/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database (不要提交数据库文件)
+*.db
+*.db-shm
+*.db-wal
+data/conversations.db
+data/conversations.db-shm
+data/conversations.db-wal
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
 *.log
+logs/
+*.log.*
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Documentation (AI 开发笔记)
+AI-note/
+*.md.bak
+
+# Development scripts
+delete_by_threadID.py
+
+# OS
+.DS_Store
+Thumbs.db
+*.bak
+
+# Temporary files
+*.tmp
+*.temp
+~*
+
+# Backup files
+*.backup
+*.bak
+*_backup.*
+
+# Node modules (如果有前端构建)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

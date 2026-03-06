@@ -2,41 +2,122 @@ version: '3.8'
 
 services:
   notion-opus:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: notion-ai-wrapper:latest
     container_name: notion_opus
     restart: unless-stopped
+
+    # 端口映射（宿主机端口:容器端口）
     ports:
-      - "8000:8000"
-    # 将包含 .env 的宿主机文件映射给容器
+      - "${HOST_PORT:-8000}:8000"
+
+    # 环境变量配置
     env_file:
       - .env
     environment:
+      # 覆盖 .env 中的数据库路径，确保指向容器内的路径
       - DB_PATH=/app/data/conversations.db
-    # 持久化聊天记录数据库
-    volumes:
-      - ./data:/app/data
+      # Python 配置
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Shanghai
 
-# ----------------------------------------------------
-# 提示: 如果你希望使用 Nginx 作为反向代理提供 HTTPS 支持
-# 可以在宿主机的 Nginx 增加如下配置：
-# 
+    # 数据持久化
+    volumes:
+      # 持久化数据库
+      - ./data:/app/data
+      # 可选：挂载日志目录
+      - ./logs:/app/logs
+
+    # 资源限制（防止容器占满服务器资源）
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'      # 最多使用 2 个 CPU 核心
+          memory: 2G       # 最多使用 2GB 内存
+        reservations:
+          cpus: '0.5'      # 保留 0.5 个 CPU 核心
+          memory: 512M     # 保留 512MB 内存
+
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s    # 每 30 秒检查一次
+      timeout: 10s     # 超时时间 10 秒
+      retries: 3       # 失败 3 次后标记为不健康
+      start_period: 10s # 容器启动后 10 秒才开始检查
+
+    # 日志配置（防止日志占满磁盘）
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"   # 单个日志文件最大 10MB
+        max-file: "3"     # 最多保留 3 个日志文件
+
+    # 网络配置（使用自定义网络）
+    networks:
+      - notion-network
+
+# 自定义网络（更好的网络隔离和 DNS 解析）
+networks:
+  notion-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# ============================================================
+# 部署说明：
+#
+# 1. 本地开发：
+#    docker-compose up
+#
+# 2. 生产环境：
+#    docker-compose up -d
+#    docker-compose logs -f
+#
+# 3. 查看健康状态：
+#    docker-compose ps
+#    curl http://localhost:8000/health
+#
+# 4. 更新并重启：
+#    docker-compose down
+#    docker-compose build --no-cache
+#    docker-compose up -d
+#
+# ============================================================
+# Nginx 反向代理配置示例（用于生产环境）
+#
 # server {
 #     listen 443 ssl http2;
 #     server_name your-domain.com;
-#     
-#     # 此处配置 SSL 证书
+#
+#     # SSL 证书配置
 #     ssl_certificate /path/to/cert.crt;
 #     ssl_certificate_key /path/to/cert.key;
-# 
+#
+#     # 反向代理到容器
 #     location / {
 #         proxy_pass http://127.0.0.1:8000;
 #         proxy_set_header Host $host;
 #         proxy_set_header X-Real-IP $remote_addr;
-#         
-#         # 支持流式输出，禁用代理缓冲
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#
+#         # 支持流式输出
 #         proxy_buffering off;
 #         proxy_cache off;
+#         proxy_read_timeout 300s;
 #         chunked_transfer_encoding on;
 #     }
+#
+#     # WebSocket 支持（如果需要）
+#     location /ws {
+#         proxy_pass http://127.0.0.1:8000;
+#         proxy_http_version 1.1;
+#         proxy_set_header Upgrade $http_upgrade;
+#         proxy_set_header Connection "upgrade";
+#     }
 # }
-# ----------------------------------------------------
+# ============================================================
