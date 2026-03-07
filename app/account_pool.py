@@ -46,9 +46,9 @@ class AccountPool:
                 # 如果转了一圈都没找到可用的
                 if self._current_index == start_index:
                     next_available = min(self.cooldown_until)
-                    wait_seconds = max(0, int(next_available - now))
+                    wait_seconds = max(1, int(next_available - now))
                     raise RuntimeError(
-                        f"所有 Notion 账号均不可用（处于冷却隔离或异常状态），预计 {wait_seconds} 秒后可重试。"
+                        f"Notion 账号限流中（触发官方公平使用政策），请在 {wait_seconds} 秒后重试。"
                     )
 
     def get_status_summary(self) -> Dict[str, int]:

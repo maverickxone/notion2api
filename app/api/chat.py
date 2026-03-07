@@ -482,7 +482,17 @@ async def create_chat_completion(
                 "No available client in account pool",
                 extra={"request_info": {"event": "account_pool_unavailable", "detail": str(exc)}},
             )
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
+            # 返回标准的 OpenAI 错误格式，让客户端（如 Cherry Studio）能直观显示报错
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": {
+                        "message": str(exc),
+                        "type": "rate_limit_error",
+                        "code": "account_pool_cooling"
+                    }
+                }
+            )
         except HTTPException:
             raise
         except Exception:
