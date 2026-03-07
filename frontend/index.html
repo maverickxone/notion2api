@@ -1469,6 +1469,9 @@
                 }
 
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        throw new Error("API KEY doesn't match.");
+                    }
                     throw new Error(`HTTP Error: ${response.status}`);
                 }
 
@@ -1502,6 +1505,13 @@
                             updateThinkingPanel(aiWrapper);
                         }
                         return;
+                    }
+
+                    const deltaReasoning = dataObj?.choices?.[0]?.delta?.reasoning_content || '';
+                    if (deltaReasoning) {
+                        thinkingText += deltaReasoning;
+                        aiWrapper.thinkingText = thinkingText;
+                        updateThinkingPanel(aiWrapper);
                     }
 
                     const deltaContent = dataObj?.choices?.[0]?.delta?.content || '';

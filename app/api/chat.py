@@ -39,12 +39,22 @@ RECALL_INTENT_KEYWORDS = [
 ]
 
 
-def _build_stream_chunk(response_id: str, model: str, *, content: str = "", role: str = "", finish_reason=None) -> str:
+def _build_stream_chunk(
+    response_id: str,
+    model: str,
+    *,
+    content: str = "",
+    reasoning_content: str = "",
+    role: str = "",
+    finish_reason=None,
+) -> str:
     delta: Dict[str, Any] = {}
     if role:
         delta["role"] = role
     if content:
         delta["content"] = content
+    if reasoning_content:
+        delta["reasoning_content"] = reasoning_content
 
     payload = {
         "id": response_id,
@@ -56,20 +66,27 @@ def _build_stream_chunk(response_id: str, model: str, *, content: str = "", role
     return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
-def _build_search_metadata_chunk(search_data: dict[str, Any]) -> str:
-    payload = {
-        "type": "search_metadata",
-        "searches": search_data,
-    }
-    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+def _format_search_results_md(search_data: dict[str, Any]) -> str:
+    """将搜索数据格式化为 Markdown 引用块，以便标准客户端显示。"""
+    lines = []
+    queries = search_data.get("queries", [])
+    if queries:
+        lines.append(f"> 🔍 **已搜索:** {', '.join(queries)}")
 
-
-def _build_thinking_chunk(text: str) -> str:
-    payload = {
-        "type": "thinking_chunk",
-        "text": text,
-    }
-    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+    sources = search_data.get("sources", [])
+    if sources:
+        lines.append("> 🌐 **来源:**")
+        for i, src in enumerate(sources[:5], 1):  # 最多显示5个来源，避免刷屏
+            title = src.get("title") or src.get("url") or "未知来源"
+            url = src.get("url")
+            if url:
+                lines.append(f"> {i}. [{title}]({url})")
+            else:
+                lines.append(f"> {i}. {title}")
+    
+    if lines:
+        return "\n".join(lines) + "\n\n"
+    return ""
 
 
 def _normalize_stream_item(item: Any) -> dict[str, Any]:
@@ -254,6 +271,7 @@ async def create_chat_completion(
             def openai_stream_generator() -> Generator[str, None, None]:
                 full_text_accumulator = ""
                 assistant_started = False
+                pending_search_md = ""
 
                 try:
                     for raw_item in _iter_stream_items(first_item, stream_gen):
@@ -263,21 +281,51 @@ async def create_chat_completion(
                         if item_type == "search":
                             search_data = item.get("data")
                             if isinstance(search_data, dict) and search_data:
-                                yield _build_search_metadata_chunk(search_data)
+                                pending_search_md += _format_search_results_md(search_data)
+                                # Send a specialized chunk for the local frontend to populate its custom UI.
+                                # Includes an empty 'choices' array to remain valid for standard OpenAI clients.
+                                local_ui_payload = {
+                                    "id": response_id,
+                                    "object": "chat.completion.chunk",
+                                    "created": int(time.time()),
+                                    "model": req_body.model,
+                                    "choices": [{"index": 0, "delta": {}, "finish_reason": None}],
+                                    "type": "search_metadata",
+                                    "searches": search_data
+                                }
+                                yield f"data: {json.dumps(local_ui_payload, ensure_ascii=False)}\n\n"
                             continue
 
                         if item_type == "thinking":
                             thinking_text = item.get("text", "")
                             if thinking_text:
-                                yield _build_thinking_chunk(thinking_text)
+                                if not assistant_started:
+                                    assistant_started = True
+                                    yield _build_stream_chunk(
+                                        response_id,
+                                        req_body.model,
+                                        role="assistant",
+                                        reasoning_content=thinking_text,
+                                    )
+                                else:
+                                    yield _build_stream_chunk(
+                                        response_id,
+                                        req_body.model,
+                                        reasoning_content=thinking_text,
+                                    )
                             continue
 
                         if item_type != "content":
                             continue
 
                         chunk_text = item.get("text", "")
-                        if not chunk_text:
+                        if not chunk_text and not pending_search_md:
                             continue
+
+                        # 在第一个正文内容发出前，把积攒的搜索信息拼上去
+                        if pending_search_md:
+                            chunk_text = pending_search_md + chunk_text
+                            pending_search_md = ""
 
                         full_text_accumulator += chunk_text
                         if not assistant_started:
@@ -288,9 +336,8 @@ async def create_chat_completion(
                                 role="assistant",
                                 content=chunk_text,
                             )
-                            continue
-
-                        yield _build_stream_chunk(response_id, req_body.model, content=chunk_text)
+                        else:
+                            yield _build_stream_chunk(response_id, req_body.model, content=chunk_text)
                 except asyncio.CancelledError:
                     logger.info(
                         "Streaming response cancelled by downstream client",

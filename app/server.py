@@ -125,7 +125,7 @@ async def api_key_auth(request: Request, call_next):
                     status_code=401,
                     content={
                         "error": {
-                            "message": "Invalid Authentication API Key.",
+                            "message": "Error: API KEY doesn't match.",
                             "type": "invalid_request_error",
                             "code": "invalid_api_key"
                         }

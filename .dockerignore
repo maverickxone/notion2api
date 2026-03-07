@@ -23,11 +23,17 @@ env/
 
 # Environment variables
 .env
+.env.*
 
-# Database (will be mounted as volume)
+# Data & Database
+data/
 *.db
 *.db-shm
 *.db-wal
+
+# Logs
+logs/
+*.log
 
 # Git
 .git/
@@ -38,25 +44,24 @@ README.md
 *.md
 docs/
 
-# Development notes
+# AI Development Notes (Do not include in Docker image)
 AI-note/
-delete_by_threadID.py
-*.bak
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
 
 # Testing
 .pytest_cache/
 .coverage
+test.py
+test_strip.py
 htmlcov/
 
-# Docker
+# Deployment & Docker
 Dockerfile
 docker-compose.yml
 .dockerignore
+deploy.sh
+deploy.bat
+manage.sh
+
+# OS
+.DS_Store
+Thumbs.db

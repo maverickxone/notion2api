@@ -389,8 +389,9 @@ def _extract_search_data_from_patch(patch: dict[str, Any]) -> dict[str, Any]:
 
 def _extract_text_from_patch(patch: dict[str, Any]) -> str:
     content = ""
+    patch_op = patch.get("o")
 
-    if patch.get("o") == "a":
+    if patch_op == "a":
         patch_v = patch.get("v", {})
         if isinstance(patch_v, dict) and "value" in patch_v:
             val = patch_v["value"]
@@ -403,8 +404,14 @@ def _extract_text_from_patch(patch: dict[str, Any]) -> str:
             elif isinstance(val, str) and patch.get("type") == "title":
                 content = f"\n[??]: {val}\n"
 
-    elif patch.get("o") == "x" and "v" in patch:
+    elif patch_op == "x" and "v" in patch:
         content = patch["v"] if isinstance(patch["v"], str) else ""
+    
+    elif patch_op == "p" and "v" in patch:
+        # 路径替换有时也携带文本内容
+        path = _normalize_path(patch)
+        if "/content" in path or "/text" in path:
+            content = patch["v"] if isinstance(patch["v"], str) else ""
 
     return content
 
