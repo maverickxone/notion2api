@@ -2,8 +2,8 @@ import os
 import json
 from dotenv import load_dotenv
 
-# 加载 .env 文件中的环境变量
-load_dotenv()
+# 加载 .env 文件中的环境变量（override=True 确保 .env 优先于系统环境变量）
+load_dotenv(override=True)
 
 REQUIRED_ACCOUNT_FIELDS = {"token_v2", "space_id", "user_id"}
 

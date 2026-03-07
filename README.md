@@ -177,7 +177,7 @@ curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-api-key" \
   -d '{
-    "model": "notion-opus",
+    "model": "claude-opus4.6",
     "messages": [
       {"role": "user", "content": "你好，请介绍一下你自己"}
     ],
@@ -187,8 +187,10 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 
 ### 支持的模型
 
-- `notion-opus` - Notion AI 的 Claude Opus 模型
-- `notion-sonnet` - Notion AI 的 Claude Sonnet 模型
+- `claude-opus4.6` - Claude Opus 4.6
+- `claude-sonnet4.6` - Claude Sonnet 4.6
+- `gemini-3.1pro` - Gemini 3.1 Pro
+- `gpt-5.2` - GPT-5.2
 
 ### Python 示例
 
@@ -202,7 +204,7 @@ headers = {
 }
 
 data = {
-    "model": "notion-opus",
+    "model": "claude-opus4.6",
     "messages": [
         {"role": "user", "content": "解释一下量子计算"}
     ],
@@ -225,7 +227,7 @@ headers = {
 }
 
 data = {
-    "model": "notion-opus",
+    "model": "claude-opus4.6",
     "messages": [
         {"role": "user", "content": "写一首关于春天的诗"}
     ],

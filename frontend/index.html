@@ -12,6 +12,9 @@
     <!-- Marked.js (CDN) -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
+    <!-- DOMPurify (CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+
     <!-- Highlight.js (CDN) for Markdown Code Blocks -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -582,7 +585,7 @@
                     <div class="absolute right-[48px] bottom-[14px]">
                         <button id="modelTriggerBtn" type="button"
                             class="flex items-center gap-1.5 text-[13px] italic border border-black/10 dark:border-white/10 dark:bg-white/5 dark:text-white/75 bg-black/5 text-black/75 px-2.5 py-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
-                            <span id="modelTriggerText">claude-sonnet4.6</span>
+                                <span id="modelTriggerText">Claude Sonnet 4.6</span>
                             <span class="text-[10px] mt-0.5">∨</span>
                         </button>
 
@@ -593,7 +596,7 @@
                                 <button type="button"
                                     class="w-full text-left p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between group transition-colors">
                                     <div class="flex flex-col gap-0.5 pt-0.5">
-                                        <span class="text-sm font-medium">claude-sonnet4.6</span>
+                                <span class="text-sm font-medium">Claude Sonnet 4.6</span>
                                         <span class="text-xs text-black/50 dark:text-white/50">Most efficient for
                                             everyday tasks</span>
                                     </div>
@@ -671,9 +674,38 @@
     <!-- Application Logic -->
     <script>
         // --- 1. State Management ---
+        const API_KEY_STORAGE_KEY = 'claude_api_key';
+
+        function loadStoredApiKey() {
+            const apiKey = localStorage.getItem(API_KEY_STORAGE_KEY) || sessionStorage.getItem(API_KEY_STORAGE_KEY) || '';
+            return apiKey;
+        }
+
+        function persistApiKey(apiKey) {
+            if (apiKey) {
+                localStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
+                sessionStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
+            } else {
+                localStorage.removeItem(API_KEY_STORAGE_KEY);
+                sessionStorage.removeItem(API_KEY_STORAGE_KEY);
+            }
+        }
+
+        function renderMarkdownToSafeHtml(markdown) {
+            const renderedHtml = marked.parse(markdown || '');
+            return DOMPurify.sanitize(renderedHtml, {
+                USE_PROFILES: { html: true },
+                ADD_ATTR: ['target', 'rel']
+            });
+        }
+
+        function setSafeMarkdown(container, markdown) {
+            container.innerHTML = renderMarkdownToSafeHtml(markdown);
+        }
+
         const STATE = {
             baseUrl: localStorage.getItem('claude_base_url') || window.location.origin,
-            apiKey: localStorage.getItem('claude_api_key') || '',
+            apiKey: loadStoredApiKey(),
             theme: localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
             chats: JSON.parse(localStorage.getItem('claude_chats')) || [], // [{id, title, messages: [{role, content}]}]
             currentChatId: null,
@@ -725,12 +757,12 @@
         };
 
         const LOCAL_MODELS = [
-            { id: "claude-opus4.6", label: "claude-opus4.6" },
-            { id: "gemini-3.1pro", label: "gemini-3.1pro" },
-            { id: "gpt-5.2", label: "gpt-5.2" }
+            { id: "claude-opus4.6", label: "Claude Opus 4.6" },
+            { id: "gemini-3.1pro", label: "Gemini 3.1 Pro" },
+            { id: "gpt-5.2", label: "GPT-5.2" }
         ];
         let currentSelectedModel = "claude-sonnet4.6";
-        let currentSelectedModelLabel = "claude-sonnet4.6";
+        let currentSelectedModelLabel = "Claude Sonnet 4.6";
 
         // --- 2. Initialization ---
         function init() {
@@ -880,7 +912,7 @@
             STATE.baseUrl = DOM.baseUrlInput.value.trim().replace(/\/$/, "");
             STATE.apiKey = DOM.apiKeyInput.value.trim();
             localStorage.setItem('claude_base_url', STATE.baseUrl);
-            localStorage.setItem('claude_api_key', STATE.apiKey);
+            persistApiKey(STATE.apiKey);
             closeSettings();
             loadModels(); // Refresh models with new config
         }
@@ -921,17 +953,17 @@
             // Primary Model is managed implicitly in level 1 HTML
             DOM.dropdownLevel1.firstElementChild.onclick = (e) => {
                 e.stopPropagation();
-                handleModelSelect("claude-sonnet4.6", "claude-sonnet4.6");
+                handleModelSelect("claude-sonnet4.6", "Claude Sonnet 4.6");
             }
         }
 
         async function loadModels() {
             // Models logic replaced by custom UI implementation task 2.
             STATE.modelDisplayNames = {
-                "claude-sonnet4.6": "claude-sonnet4.6",
-                "claude-opus4.6": "claude-opus4.6",
-                "gemini-3.1pro": "gemini-3.1pro",
-                "gpt-5.2": "gpt-5.2"
+                "claude-sonnet4.6": "Claude Sonnet 4.6",
+                "claude-opus4.6": "Claude Opus 4.6",
+                "gemini-3.1pro": "Gemini 3.1 Pro",
+                "gpt-5.2": "GPT-5.2"
             };
         }
 
@@ -979,9 +1011,35 @@
             scrollToBottom();
         }
 
-        function deleteChat(e, id) {
+        async function deleteChat(e, id) {
             e.stopPropagation(); // Prevent selectChat
             if (STATE.isGenerating) return;
+
+            const chat = STATE.chats.find(c => c.id === id);
+            if (!chat) return;
+
+            try {
+                if (chat.conversationId) {
+                    const response = await fetch(
+                        `${STATE.baseUrl}/v1/conversations/${encodeURIComponent(chat.conversationId)}`,
+                        {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `Bearer ${STATE.apiKey}`
+                            }
+                        }
+                    );
+
+                    if (!response.ok && response.status !== 404) {
+                        console.error('Delete conversation failed:', response.status);
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.error('Delete conversation request failed:', err);
+                return;
+            }
+
             STATE.chats = STATE.chats.filter(c => c.id !== id);
             saveChats();
             renderChatList();
@@ -1252,7 +1310,7 @@
                 if (content === '') {
                     mdDiv.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
                 } else {
-                    mdDiv.innerHTML = marked.parse(content);
+                    setSafeMarkdown(mdDiv, content);
                     if (isFinished) {
                         mdDiv.querySelectorAll('pre code').forEach((block) => {
                             hljs.highlightElement(block);
@@ -1313,7 +1371,7 @@
 
             if (wrapper.thinkingExpanded) {
                 wrapper.thinkingDetailsRef.classList.remove('hidden');
-                wrapper.thinkingMarkdownRef.innerHTML = marked.parse(rawText);
+                setSafeMarkdown(wrapper.thinkingMarkdownRef, rawText);
             } else {
                 wrapper.thinkingDetailsRef.classList.add('hidden');
             }
@@ -1329,7 +1387,7 @@
                 return;
             }
 
-            mdDiv.innerHTML = marked.parse(content);
+            setSafeMarkdown(mdDiv, content);
             if (isFinished) {
                 mdDiv.querySelectorAll('pre code').forEach((block) => {
                     if (!block.dataset.highlighted) hljs.highlightElement(block);

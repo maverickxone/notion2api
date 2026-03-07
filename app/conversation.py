@@ -5,7 +5,6 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from app.logger import logger
-from app.model_registry import get_notion_model
 
 
 class ConversationManager:
@@ -200,7 +199,7 @@ class ConversationManager:
             "type": "config",
             "value": {
                 "type": "workflow",
-                "model": get_notion_model(model_name),
+                "model": model_name,
                 "modelFromUser": True,
                 "useWebSearch": True,
                 "useReadOnlyMode": False,
@@ -545,9 +544,11 @@ class ConversationManager:
             if not row:
                 raise ValueError(f"Conversation ID '{conversation_id}' does not exist.")
 
-            recent_messages = self._fetch_recent_messages(conn, conversation_id, self.WINDOW_SIZE)
+            message_count = self._count_messages(conn, conversation_id)
+            active_window_limit = message_count if message_count > self.WINDOW_SIZE else self.WINDOW_SIZE
+            recent_messages = self._fetch_recent_messages(conn, conversation_id, active_window_limit)
             summaries = self._fetch_recent_done_summaries(conn, conversation_id)
-            memory_degraded = self._has_failed_compression(conn, conversation_id)
+            memory_degraded = False
 
             recall_round_indices = self._search_recall_round_indices(
                 conn,
@@ -561,15 +562,6 @@ class ConversationManager:
 
         transcript.append(self._build_config_block(model_name))
         transcript.append(self._build_context_block(notion_client))
-
-        if memory_degraded:
-            transcript.append(
-                self._build_dialog_block(
-                    "user",
-                    "【系统状态标记】MEMORY_STATUS=degraded",
-                    notion_client,
-                )
-            )
 
         # Summary injection must stay between context block and recent-window messages.
         if summaries:
@@ -638,10 +630,11 @@ class ConversationManager:
         )
         return payload["transcript"]
 
-    def delete_conversation(self, conversation_id: str) -> None:
+    def delete_conversation(self, conversation_id: str) -> bool:
         with self._get_conn() as conn:
-            conn.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
+            cursor = conn.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
             conn.commit()
+            return cursor.rowcount > 0
 
     def list_conversations(self) -> List[str]:
         with self._get_conn() as conn:
@@ -655,7 +648,11 @@ async def compress_round_if_needed(manager: ConversationManager, conversation_id
 
     Any failure is logged only and never raised to request path.
     """
-    from app.summarizer import SummarizerUnavailableError, summarize_turn
+    from app.summarizer import (
+        SummarizerUnavailableError,
+        is_summarizer_configured,
+        summarize_turn,
+    )
 
     try:
         while True:
@@ -708,50 +705,6 @@ async def compress_round_if_needed(manager: ConversationManager, conversation_id
                 round_index = max(next_round_index - rounds_in_messages, 0)
                 created_at = int(datetime.datetime.now().timestamp())
 
-                conn.execute(
-                    "DELETE FROM messages WHERE id IN (?, ?)",
-                    (oldest_user["id"], oldest_assistant["id"]),
-                )
-                insert_cursor = conn.execute(
-                    """
-                    INSERT INTO compressed_summaries (
-                        conversation_id,
-                        round_index,
-                        user_content,
-                        assistant_content,
-                        summary,
-                        compress_status,
-                        created_at
-                    )
-                    VALUES (?, ?, ?, ?, NULL, 'pending', ?)
-                    """,
-                    (
-                        conversation_id,
-                        round_index,
-                        oldest_user["content"],
-                        oldest_assistant["content"],
-                        created_at,
-                    ),
-                )
-                summary_id = int(insert_cursor.lastrowid)
-
-                manager._archive_message(
-                    conn,
-                    conversation_id,
-                    "user",
-                    str(oldest_user["content"]),
-                    round_index,
-                    int(oldest_user["created_at"] or created_at),
-                )
-                manager._archive_message(
-                    conn,
-                    conversation_id,
-                    "assistant",
-                    str(oldest_assistant["content"]),
-                    round_index,
-                    int(oldest_assistant["created_at"] or created_at),
-                )
-
                 old_summary_rows = conn.execute(
                     """
                     SELECT summary
@@ -776,54 +729,50 @@ async def compress_round_if_needed(manager: ConversationManager, conversation_id
                         }
                     },
                 )
-                conn.commit()
+
+                candidate = {
+                    "user_id": int(oldest_user["id"]),
+                    "assistant_id": int(oldest_assistant["id"]),
+                    "user_content": str(oldest_user["content"]),
+                    "assistant_content": str(oldest_assistant["content"]),
+                    "user_created_at": int(oldest_user["created_at"] or created_at),
+                    "assistant_created_at": int(oldest_assistant["created_at"] or created_at),
+                    "round_index": round_index,
+                    "created_at": created_at,
+                }
+
+            if not is_summarizer_configured():
+                logger.warning(
+                    "Skipping compression because summarizer is not configured",
+                    extra={
+                        "request_info": {
+                            "event": "conversation_compress_skipped_no_summarizer",
+                            "conversation_id": conversation_id,
+                            "message_count": message_count,
+                        }
+                    },
+                )
+                return
 
             try:
                 summary_text = await summarize_turn(
                     old_summaries=old_summaries,
-                    user_msg=str(oldest_user["content"]),
-                    assistant_msg=str(oldest_assistant["content"]),
+                    user_msg=candidate["user_content"],
+                    assistant_msg=candidate["assistant_content"],
                 )
             except SummarizerUnavailableError:
-                failure_time = int(datetime.datetime.now().timestamp())
-                with manager._get_conn() as conn:
-                    conn.execute(
-                        """
-                        UPDATE compressed_summaries
-                        SET compress_status = 'failed'
-                        WHERE id = ?
-                        """,
-                        (summary_id,),
-                    )
-                    conn.execute(
-                        """
-                        UPDATE conversations
-                        SET compress_failed_at = ?
-                        WHERE id = ?
-                        """,
-                        (failure_time, conversation_id),
-                    )
-                    conn.commit()
+                logger.warning(
+                    "Compression summary unavailable; active messages retained",
+                    extra={
+                        "request_info": {
+                            "event": "conversation_compress_summary_unavailable",
+                            "conversation_id": conversation_id,
+                            "round_index": candidate["round_index"],
+                        }
+                    },
+                )
+                return
             except Exception:
-                failure_time = int(datetime.datetime.now().timestamp())
-                with manager._get_conn() as conn:
-                    conn.execute(
-                        """
-                        UPDATE compressed_summaries
-                        SET compress_status = 'failed'
-                        WHERE id = ?
-                        """,
-                        (summary_id,),
-                    )
-                    conn.execute(
-                        """
-                        UPDATE conversations
-                        SET compress_failed_at = ?
-                        WHERE id = ?
-                        """,
-                        (failure_time, conversation_id),
-                    )
-                    conn.commit()
                 logger.error(
                     "Failed to summarize compressed round",
                     exc_info=True,
@@ -831,20 +780,108 @@ async def compress_round_if_needed(manager: ConversationManager, conversation_id
                         "request_info": {
                             "event": "conversation_compress_summary_failed",
                             "conversation_id": conversation_id,
-                            "round_index": round_index,
-                            "summary_id": summary_id,
+                            "round_index": candidate["round_index"],
                         }
                     },
                 )
+                return
             else:
+                summary_text = summary_text.strip()
+                if not summary_text:
+                    logger.warning(
+                        "Compression summary was empty; active messages retained",
+                        extra={
+                            "request_info": {
+                                "event": "conversation_compress_summary_empty",
+                                "conversation_id": conversation_id,
+                                "round_index": candidate["round_index"],
+                            }
+                        },
+                    )
+                    return
+
                 with manager._get_conn() as conn:
+                    current_message_count = manager._count_messages(conn, conversation_id)
+                    if current_message_count <= manager.WINDOW_SIZE:
+                        return
+
+                    current_pair = conn.execute(
+                        """
+                        SELECT id, role
+                        FROM messages
+                        WHERE id IN (?, ?)
+                        ORDER BY created_at ASC, id ASC
+                        """,
+                        (candidate["user_id"], candidate["assistant_id"]),
+                    ).fetchall()
+                    if (
+                        len(current_pair) != 2
+                        or int(current_pair[0]["id"]) != candidate["user_id"]
+                        or int(current_pair[1]["id"]) != candidate["assistant_id"]
+                        or current_pair[0]["role"] != "user"
+                        or current_pair[1]["role"] != "assistant"
+                    ):
+                        logger.info(
+                            "Compression candidate changed before commit; retrying with fresh snapshot",
+                            extra={
+                                "request_info": {
+                                    "event": "conversation_compress_candidate_stale",
+                                    "conversation_id": conversation_id,
+                                    "round_index": candidate["round_index"],
+                                }
+                            },
+                        )
+                        continue
+
+                    conn.execute(
+                        "DELETE FROM messages WHERE id IN (?, ?)",
+                        (candidate["user_id"], candidate["assistant_id"]),
+                    )
                     conn.execute(
                         """
-                        UPDATE compressed_summaries
-                        SET summary = ?, compress_status = 'done'
+                        INSERT INTO compressed_summaries (
+                            conversation_id,
+                            round_index,
+                            user_content,
+                            assistant_content,
+                            summary,
+                            compress_status,
+                            created_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, 'done', ?)
+                        """,
+                        (
+                            conversation_id,
+                            candidate["round_index"],
+                            candidate["user_content"],
+                            candidate["assistant_content"],
+                            summary_text,
+                            candidate["created_at"],
+                        ),
+                    )
+                    manager._archive_message(
+                        conn,
+                        conversation_id,
+                        "user",
+                        candidate["user_content"],
+                        candidate["round_index"],
+                        candidate["user_created_at"],
+                    )
+                    manager._archive_message(
+                        conn,
+                        conversation_id,
+                        "assistant",
+                        candidate["assistant_content"],
+                        candidate["round_index"],
+                        candidate["assistant_created_at"],
+                    )
+                    conn.execute(
+                        """
+                        UPDATE conversations
+                        SET compress_failed_at = NULL
                         WHERE id = ?
                         """,
-                        (summary_text.strip(), summary_id),
+                        (conversation_id,),
                     )
                     conn.commit()
     except Exception:

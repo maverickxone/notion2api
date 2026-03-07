@@ -1,6 +1,6 @@
 """
 API 测试脚本 —— 测试 notion-ai 服务的 /v1/chat/completions 接口
-模型: claude-sonnet (Sonnet 4.6)
+模型: claude-sonnet4.6
 """
 
 import requests
@@ -11,7 +11,7 @@ import json
 # =====================
 BASE_URL = "http://localhost:8000"
 API_KEY  = "ustc-mav-20260306"       # 与 .env 中 API_KEY 保持一致；若未设置 API_KEY 可留空
-MODEL    = "claude-sonnet4.6"           # Sonnet 4.6，见 app/model_registry.py
+MODEL    = "claude-sonnet4.6"           # 标准 API 模型名，见 app/model_registry.py
 
 HEADERS = {
     "Content-Type": "application/json",

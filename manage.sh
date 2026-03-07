@@ -68,7 +68,7 @@ case "$1" in
         curl -X POST http://localhost:8000/v1/chat/completions \
             -H "Content-Type: application/json" \
             -d '{
-                "model": "notion-opus",
+                "model": "claude-opus4.6",
                 "messages": [{"role": "user", "content": "Hello"}],
                 "stream": false
             }'

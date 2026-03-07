@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 import time
@@ -166,6 +167,21 @@ def _persist_round(
     )
 
 
+def _persist_history_messages(manager, conversation_id: str, history_messages: List[Tuple[str, str]]) -> None:
+    for role, content in history_messages:
+        manager.add_message(conversation_id, role, content)
+
+
+def _is_client_disconnect_error(exc: BaseException) -> bool:
+    if isinstance(exc, asyncio.CancelledError):
+        return True
+    if isinstance(exc, (BrokenPipeError, ConnectionResetError)):
+        return True
+    if isinstance(exc, OSError):
+        return exc.errno in {32, 54, 104, 10053, 10054}
+    return False
+
+
 @router.post("/chat/completions", tags=["chat"])
 @limiter.limit("10/minute")
 async def create_chat_completion(
@@ -191,8 +207,10 @@ async def create_chat_completion(
         )
 
     conversation_id = req_body.conversation_id.strip() if req_body.conversation_id else ""
+    restore_history = False
     if not conversation_id:
         conversation_id = manager.new_conversation()
+        restore_history = True
     elif not manager.conversation_exists(conversation_id):
         logger.warning(
             "Conversation id not found, creating a fresh conversation",
@@ -204,10 +222,10 @@ async def create_chat_completion(
             },
         )
         conversation_id = manager.new_conversation()
+        restore_history = True
 
-    if not req_body.conversation_id:
-        for role, content in history_messages:
-            manager.add_message(conversation_id, role, content)
+    if restore_history and history_messages:
+        _persist_history_messages(manager, conversation_id, history_messages)
 
     response_id = f"chatcmpl-{uuid.uuid4().hex}"
     max_retries = min(3, len(pool.clients))
@@ -273,10 +291,35 @@ async def create_chat_completion(
                             continue
 
                         yield _build_stream_chunk(response_id, req_body.model, content=chunk_text)
-                except Exception:
-                    if client is not None:
+                except asyncio.CancelledError:
+                    logger.info(
+                        "Streaming response cancelled by downstream client",
+                        extra={
+                            "request_info": {
+                                "event": "stream_cancelled_by_client",
+                                "conversation_id": conversation_id,
+                                "attempt": attempt,
+                            }
+                        },
+                    )
+                    raise
+                except BaseException as exc:
+                    if _is_client_disconnect_error(exc):
+                        logger.info(
+                            "Streaming connection closed by downstream client",
+                            extra={
+                                "request_info": {
+                                    "event": "stream_client_disconnected",
+                                    "conversation_id": conversation_id,
+                                    "attempt": attempt,
+                                }
+                            },
+                        )
+                        return
+                    if isinstance(exc, NotionUpstreamError) and client is not None and exc.retriable:
                         pool.mark_failed(client)
-                    logger.error(
+                    log_method = logger.warning if isinstance(exc, NotionUpstreamError) else logger.error
+                    log_method(
                         "Streaming response interrupted",
                         exc_info=True,
                         extra={
@@ -284,6 +327,7 @@ async def create_chat_completion(
                                 "event": "stream_interrupted",
                                 "conversation_id": conversation_id,
                                 "attempt": attempt,
+                                "is_upstream_error": isinstance(exc, NotionUpstreamError),
                             }
                         },
                     )
@@ -412,3 +456,12 @@ async def create_chat_completion(
                 )
 
     raise HTTPException(status_code=503, detail="Service unavailable: all upstream retries exhausted.")
+
+
+@router.delete("/conversations/{conversation_id}", tags=["chat"])
+async def delete_conversation(conversation_id: str, request: Request):
+    manager = request.app.state.conversation_manager
+    deleted = manager.delete_conversation(conversation_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    return {"id": conversation_id, "deleted": True}

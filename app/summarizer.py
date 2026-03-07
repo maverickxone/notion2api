@@ -17,6 +17,10 @@ SYSTEM_PROMPT = (
 )
 
 
+def is_summarizer_configured() -> bool:
+    return bool(SILICONFLOW_API_KEY.strip())
+
+
 def _build_user_prompt(old_summaries: list[str], user_msg: str, assistant_msg: str) -> str:
     prompt_parts = []
     if old_summaries:
@@ -73,7 +77,7 @@ async def summarize_turn(
     """
     调用 LLM 将一轮对话压缩为简短摘要，返回摘要字符串。失败时抛出异常。
     """
-    if not SILICONFLOW_API_KEY.strip():
+    if not is_summarizer_configured():
         raise SummarizerUnavailableError("SILICONFLOW_API_KEY is empty")
 
     last_error: Exception | None = None

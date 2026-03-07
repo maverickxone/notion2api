@@ -7,6 +7,7 @@ import requests
 import urllib3
 
 from app.logger import logger
+from app.model_registry import get_notion_model
 from app.stream_parser import parse_stream
 
 # 禁用 SSL 警告
@@ -45,6 +46,25 @@ class NotionOpusAPI:
         self.url = "https://www.notion.so/api/v3/runInferenceTranscript"
         self.delete_url = "https://www.notion.so/api/v3/saveTransactions"
         self.account_key = self.user_email or self.user_id or "unknown-account"
+
+    def _to_notion_transcript(self, transcript: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        converted: list[dict[str, Any]] = []
+        for block in transcript:
+            if block.get("type") != "config":
+                converted.append(block)
+                continue
+
+            value = block.get("value")
+            if not isinstance(value, dict):
+                converted.append(block)
+                continue
+
+            notion_block = dict(block)
+            notion_value = dict(value)
+            notion_value["model"] = get_notion_model(str(value.get("model", "") or ""))
+            notion_block["value"] = notion_value
+            converted.append(notion_block)
+        return converted
 
     def delete_thread(self, thread_id: str) -> None:
         """
@@ -105,6 +125,8 @@ class NotionOpusAPI:
         if not isinstance(transcript, list) or not transcript:
             raise ValueError("Invalid transcript payload: transcript must be a non-empty list.")
 
+        notion_transcript = self._to_notion_transcript(transcript)
+
         thread_id = str(uuid.uuid4())
         trace_id = str(uuid.uuid4())
         response = None
@@ -150,7 +172,7 @@ class NotionOpusAPI:
                 "annotationInferences": {},
                 "emitInferences": False,
             },
-            "transcript": transcript,
+            "transcript": notion_transcript,
         }
 
         logger.info(
