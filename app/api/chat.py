@@ -323,8 +323,11 @@ async def create_chat_completion(
                             continue
 
                         # 在第一个正文内容发出前，把积攒的搜索信息拼上去
-                        if pending_search_md:
+                        client_type = request.headers.get("X-Client-Type", "").lower()
+                        if pending_search_md and client_type != "web":
                             chunk_text = pending_search_md + chunk_text
+                        
+                        if pending_search_md:
                             pending_search_md = ""
 
                         full_text_accumulator += chunk_text

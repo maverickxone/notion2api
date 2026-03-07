@@ -585,7 +585,7 @@
                     <div class="absolute right-[48px] bottom-[14px]">
                         <button id="modelTriggerBtn" type="button"
                             class="flex items-center gap-1.5 text-[13px] italic border border-black/10 dark:border-white/10 dark:bg-white/5 dark:text-white/75 bg-black/5 text-black/75 px-2.5 py-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors">
-                                <span id="modelTriggerText">Claude Sonnet 4.6</span>
+                            <span id="modelTriggerText">Claude Sonnet 4.6</span>
                             <span class="text-[10px] mt-0.5">∨</span>
                         </button>
 
@@ -596,7 +596,7 @@
                                 <button type="button"
                                     class="w-full text-left p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-between group transition-colors">
                                     <div class="flex flex-col gap-0.5 pt-0.5">
-                                <span class="text-sm font-medium">Claude Sonnet 4.6</span>
+                                        <span class="text-sm font-medium">Claude Sonnet 4.6</span>
                                         <span class="text-xs text-black/50 dark:text-white/50">Most efficient for
                                             everyday tasks</span>
                                     </div>
@@ -1025,7 +1025,8 @@
                         {
                             method: 'DELETE',
                             headers: {
-                                'Authorization': `Bearer ${STATE.apiKey}`
+                                'Authorization': `Bearer ${STATE.apiKey}`,
+                                'X-Client-Type': 'Web'
                             }
                         }
                     );
@@ -1447,7 +1448,8 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${STATE.apiKey}`
+                        'Authorization': `Bearer ${STATE.apiKey}`,
+                        'X-Client-Type': 'Web'
                     },
                     body: JSON.stringify({
                         model: selectedModel,
