@@ -150,8 +150,19 @@ class ConversationManager:
         return messages
 
     def _normalize_window_messages(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """
+        规范化窗口消息，确保 user → assistant 成对出现。
+
+        修复前的问题：严格检查交替顺序，如果消息顺序不匹配期望就跳过，
+        导致 AI 回复被丢失。
+
+        修复后的逻辑：
+        1. 保留所有有效的 user/assistant 消息
+        2. 确保 user → assistant 成对（如果不成对，跳过）
+        3. 移除末尾不完整的 user 消息（确保以 assistant 结束）
+        """
+        # 第一步：收集所有有效的消息
         normalized: List[Dict[str, str]] = []
-        expected_role = "user"
         for msg in messages:
             role = msg.get("role", "")
             content = str(msg.get("content", "") or "")
@@ -159,15 +170,29 @@ class ConversationManager:
                 continue
             if not content.strip():
                 continue
-            if role != expected_role:
-                continue
             normalized.append({"role": role, "content": content})
-            expected_role = "assistant" if expected_role == "user" else "user"
 
-        # Keep transcript append-safe for a new user prompt.
-        while normalized and normalized[-1]["role"] != "assistant":
-            normalized.pop()
-        return normalized
+        # 第二步：确保消息是成对的 user → assistant
+        paired: List[Dict[str, str]] = []
+        i = 0
+        while i < len(normalized):
+            # 检查当前消息和下一条消息是否构成 user → assistant 对
+            if i + 1 < len(normalized):
+                current = normalized[i]
+                next_msg = normalized[i + 1]
+                if current["role"] == "user" and next_msg["role"] == "assistant":
+                    paired.extend([current, next_msg])
+                    i += 2
+                    continue
+
+            # 如果不成对，跳过当前消息
+            i += 1
+
+        # 第三步：确保 transcript 以 assistant 消息结束（便于追加新的 user prompt）
+        while paired and paired[-1]["role"] != "assistant":
+            paired.pop()
+
+        return paired
 
     def _archive_message(
         self,

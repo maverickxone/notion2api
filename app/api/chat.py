@@ -425,12 +425,13 @@ async def create_chat_completion(
                             search_data = item.get("data")
                             if isinstance(search_data, dict) and search_data:
                                 pending_search_md += _format_search_results_md(search_data)
-                                yield _build_local_ui_chunk(
-                                    response_id,
-                                    req_body.model,
-                                    "search_metadata",
-                                    searches=search_data,
-                                )
+                                if client_type == "web":
+                                    yield _build_local_ui_chunk(
+                                        response_id,
+                                        req_body.model,
+                                        "search_metadata",
+                                        searches=search_data,
+                                    )
                             continue
 
                         if item_type == "final_content":

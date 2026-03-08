@@ -56,8 +56,8 @@ SEG_META = "meta"
 
 FINAL_STEP_PRIORITIES: dict[str, int] = {
     "markdown-chat": 400,
+    "text": 350,
     "agent-inference": 300,
-    "text": 200,
     "title": 50,
 }
 
@@ -216,6 +216,25 @@ def _extract_value_index(path: str) -> int | None:
             except ValueError:
                 return None
     return None
+
+
+def _extract_value_add_index(path: str) -> int | None:
+    """
+    从 `o:"a"` 的 `/s/N/value/<idx|->` 路径中提取新 value block 序号。
+    仅匹配 value block 本身，不匹配 `/content` 等子路径。
+    """
+    parts = [p for p in path.split("/") if p]
+    if len(parts) != 4:
+        return None
+    if parts[0] != "s" or parts[2] != "value":
+        return None
+    idx_raw = parts[3]
+    if idx_raw == "-":
+        return -1
+    try:
+        return int(idx_raw)
+    except ValueError:
+        return None
 
 
 def _truncate_json(value: Any, max_len: int = 2000) -> str:
@@ -583,6 +602,26 @@ def _extract_final_content_from_record_map(data: dict[str, Any]) -> dict[str, An
                 }
             )
 
+    # 智能过滤：如果同时存在高优先级的 text/markdown-chat，则忽略 agent-inference
+    # 这可以避免 Opus/GPT 模型将所有内容都放在 agent-inference 中导致的重复显示问题
+    high_priority_types = {"text", "markdown-chat"}
+    has_high_priority = any(c["step_type"] in high_priority_types for c in candidates)
+
+    if has_high_priority:
+        original_count = len(candidates)
+        candidates = [c for c in candidates if c["step_type"] in high_priority_types]
+        logger.debug(
+            "Final content filtered",
+            extra={
+                "request_info": {
+                    "event": "final_content_filtered",
+                    "original_count": original_count,
+                    "filtered_count": len(candidates),
+                    "removed_types": [c["step_type"] for c in candidates if c["step_type"] not in high_priority_types],
+                }
+            },
+        )
+
     if not candidates:
         return None
 
@@ -595,6 +634,20 @@ def _extract_final_content_from_record_map(data: dict[str, Any]) -> dict[str, An
             int(candidate.get("length", 0)),
         ),
     )
+
+    logger.debug(
+        "Final content selected",
+        extra={
+            "request_info": {
+                "event": "final_content_selected",
+                "step_type": best.get("step_type", "unknown"),
+                "priority": best.get("priority", 0),
+                "length": len(best.get("text", "")),
+                "message_id": best.get("message_id", ""),
+            }
+        },
+    )
+
     return {
         "text": str(best.get("text", "") or ""),
         "source_type": str(best.get("step_type", "") or "unknown"),
@@ -751,12 +804,12 @@ def parse_stream(response: requests.Response) -> Generator[dict[str, Any], None,
                 if patch_seg not in segment_types:
                     segment_types[patch_seg] = _classify_segment_type(effective_type)
 
-                # 关键：检测 /s/N/value/- 子块追加
-                # 这是 Notion 在同一 segment 内新建 value block 的信号
-                # 例如 agent-inference 段落内追加 type="text" 的子块 → 这是正文
-                if "/value/-" in patch_path:
-                    vid = next_val_id.get(patch_seg, 0)
-                    next_val_id[patch_seg] = vid + 1
+                # 关键：检测 /s/N/value/<idx|-> 子块追加
+                # 某些模型会发送显式索引（/value/1）而不是 /value/-。
+                value_add_idx = _extract_value_add_index(patch_path)
+                if value_add_idx is not None:
+                    vid = next_val_id.get(patch_seg, 0) if value_add_idx < 0 else value_add_idx
+                    next_val_id[patch_seg] = max(next_val_id.get(patch_seg, 0), vid + 1)
                     val_class = _classify_segment_type(effective_type)
                     value_types[(patch_seg, vid)] = val_class
                     patch_role = val_class
