@@ -39,6 +39,22 @@ ref/
 tests/
 *.md.bak
 
+# Backup and temporary files
+*.bak
+*backup*
+*.backup
+*-backup.*
+debug_*.log
+tmp_*.log
+*.tmp
+*.old
+
+# Test files (all tests directory)
+tests/
+test_*.py
+*_test.py
+debug_*.py
+
 # Claude Code local settings
 .claude/settings.local.json
 
