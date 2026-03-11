@@ -2,6 +2,8 @@
 
 > Notion AI to OpenAI-Compatible API Wrapper
 
+🌐 [English](./README_EN.md) | 中文
+
 Notion2API 将 Notion AI 封装为 OpenAI 兼容的 API 接口，支持 Cherry Studio、Zotero第三方客户端直接使用，也可直接使用已有的前端页面。
 
 ## 特性
@@ -160,7 +162,7 @@ for chunk in response:
 # 1. 配置 .env 文件
 cp .env.example .env
 
-# 2. 启动服务
+# 2. 启���服务
 docker-compose up -d
 
 # 3. 查看日志
