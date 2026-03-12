@@ -297,7 +297,7 @@ async function handleSend() {
             });
             window.NotionAI.Chat.Storage.saveChats();
         } else if (hasThinking || hasSearch) {
-            window.NotionAI.Chat.Renderer.updateAIMessage(aiWrapper, '*未收到可显示的正文回复。*', true);
+            window.NotionAI.Chat.Renderer.updateAIMessage(aiWrapper, '*No visible response received.*', true);
             chat.messages.push({
                 role: 'assistant',
                 content: '',
@@ -307,7 +307,7 @@ async function handleSend() {
             });
             window.NotionAI.Chat.Storage.saveChats();
         } else {
-            window.NotionAI.Chat.Renderer.updateAIMessage(aiWrapper, '*未收到可显示的正文回复。*', true);
+            window.NotionAI.Chat.Renderer.updateAIMessage(aiWrapper, '*No visible response received.*', true);
         }
 
     } catch (err) {

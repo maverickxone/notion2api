@@ -152,17 +152,17 @@ window.NotionAI.Chat.Renderer = {
 
         const displayCount = sources.length || queries.length;
         const arrow = wrapper.searchExpanded ? '▾' : '▸';
-        wrapper.searchToggleRef.textContent = `已搜索 ${displayCount} 个来源 ${arrow}`;
+        wrapper.searchToggleRef.textContent = `Searched ${displayCount} source${displayCount !== 1 ? 's' : ''} ${arrow}`;
 
         wrapper.searchQueryRef.textContent = queries.length
-            ? `搜索: ${queries.map(q => `"${q}"`).join('、')} `
-            : '已执行联网搜索';
+            ? `Searched: ${queries.map(q => `"${q}"`).join(', ')} `
+            : 'Web search executed';
 
         wrapper.searchLinksRef.innerHTML = '';
         if (sources.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'search-empty';
-            empty.textContent = '暂未收到可展示来源。';
+            empty.textContent = 'No sources to display.';
             wrapper.searchLinksRef.appendChild(empty);
         } else {
             sources.forEach(source => {
@@ -255,7 +255,7 @@ window.NotionAI.Chat.Renderer = {
 
         if (content === '') {
             if (isFinished) {
-                window.NotionAI.Utils.Markdown.setSafeMarkdown(mdDiv, '*未收到可显示的正文回复。*');
+                window.NotionAI.Utils.Markdown.setSafeMarkdown(mdDiv, '*No visible response received.*');
             } else {
                 mdDiv.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
             }
