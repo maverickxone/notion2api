@@ -966,6 +966,7 @@ class ConversationManager:
         self,
         conversation_id: str,
         batch_size: int = 100,
+        conn: Optional[sqlite3.Connection] = None,
     ) -> int:
         """
         将现有 messages 表中的数据迁移到 sliding_window 表。
@@ -973,11 +974,17 @@ class ConversationManager:
         Args:
             conversation_id: 要迁移的对话 ID
             batch_size: 每批处理的消息数
+            conn: 可选的数据库连接
 
         Returns:
             int: 迁移的轮次数
         """
-        with self._get_conn() as conn:
+        is_internal_conn = False
+        if conn is None:
+            conn = self._get_conn()
+            is_internal_conn = True
+
+        try:
             # 检查是否已有滑动窗口数据
             existing_rounds = self.get_sliding_window_round_count(conn, conversation_id)
             if existing_rounds > 0:
@@ -1012,6 +1019,7 @@ class ConversationManager:
             round_number = 0
             i = 0
             created_at = int(datetime.datetime.now().timestamp())
+            rounds_to_insert = []
 
             while i < len(messages):
                 # 查找 user 消息
@@ -1034,30 +1042,32 @@ class ConversationManager:
                 assistant_thinking = str(assistant_msg["thinking"] or "")
                 msg_created_at = int(assistant_msg["created_at"] or created_at)
 
-                # 插入到 sliding_window
-                conn.execute(
+                rounds_to_insert.append((
+                    conversation_id,
+                    round_number,
+                    user_content,
+                    assistant_content,
+                    assistant_thinking,
+                    msg_created_at,
+                ))
+
+                migrated_rounds += 1
+                round_number += 1
+                i += 2
+
+            if rounds_to_insert:
+                # 批量插入到 sliding_window
+                conn.executemany(
                     """
                     INSERT OR IGNORE INTO sliding_window (
                         conversation_id, round_number, user_content,
                         assistant_content, assistant_thinking, compress_status, created_at
                     ) VALUES (?, ?, ?, ?, ?, 'active', ?)
                     """,
-                    (
-                        conversation_id,
-                        round_number,
-                        user_content,
-                        assistant_content,
-                        assistant_thinking,
-                        msg_created_at,
-                    ),
+                    rounds_to_insert,
                 )
 
-                migrated_rounds += 1
-                round_number += 1
-                i += 2
-
-            # 更新 next_round_index
-            if migrated_rounds > 0:
+                # 更新 next_round_index
                 conn.execute(
                     """
                     UPDATE conversations
@@ -1067,7 +1077,8 @@ class ConversationManager:
                     (round_number, conversation_id, round_number),
                 )
 
-            conn.commit()
+            if is_internal_conn:
+                conn.commit()
 
             logger.info(
                 "Migrated messages to sliding window",
@@ -1082,34 +1093,60 @@ class ConversationManager:
             )
 
             return migrated_rounds
+        finally:
+            if is_internal_conn:
+                conn.close()
 
     def migrate_all_conversations(self) -> Dict[str, int]:
         """
         迁移所有对话的 messages 到 sliding_window。
+        优化点：单一查询识别待处理对话，批量处理并复用连接。
 
         Returns:
             Dict[str, int]: 每个对话 ID 对应的迁移轮次数
         """
         results: Dict[str, int] = {}
-        conversation_ids = self.list_conversations()
 
-        for conv_id in conversation_ids:
-            try:
-                migrated = self.migrate_messages_to_sliding_window(conv_id)
-                if migrated > 0:
-                    results[conv_id] = migrated
-            except Exception as e:
-                logger.error(
-                    "Failed to migrate conversation",
-                    exc_info=True,
-                    extra={
-                        "request_info": {
-                            "event": "migration_failed",
-                            "conversation_id": conv_id,
-                            "error": str(e),
-                        }
-                    },
-                )
+        with self._get_conn() as conn:
+            # 找到有消息但没有滑动窗口记录的对话 ID
+            # 这里的逻辑是：对话存在于 messages 表中，但不存在于 sliding_window 表中
+            rows = conn.execute(
+                """
+                SELECT DISTINCT m.conversation_id
+                FROM messages m
+                LEFT JOIN sliding_window sw ON m.conversation_id = sw.conversation_id
+                WHERE sw.conversation_id IS NULL
+                """
+            ).fetchall()
+            conversation_ids = [row["conversation_id"] for row in rows]
+
+        if not conversation_ids:
+            logger.info("No conversations need migration.")
+            return results
+
+        # 批量处理以平衡性能和内存/锁持有时间
+        batch_size = 50
+        for i in range(0, len(conversation_ids), batch_size):
+            batch_ids = conversation_ids[i:i+batch_size]
+            with self._get_conn() as conn:
+                for conv_id in batch_ids:
+                    try:
+                        migrated = self.migrate_messages_to_sliding_window(conv_id, conn=conn)
+                        if migrated > 0:
+                            results[conv_id] = migrated
+                    except Exception as e:
+                        logger.error(
+                            "Failed to migrate conversation",
+                            exc_info=True,
+                            extra={
+                                "request_info": {
+                                    "event": "migration_failed",
+                                    "conversation_id": conv_id,
+                                    "error": str(e),
+                                }
+                            },
+                        )
+                conn.commit()
 
         logger.info(
             "Completed migration for all conversations",
