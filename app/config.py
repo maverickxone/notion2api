@@ -35,6 +35,7 @@ API_KEY = os.getenv("API_KEY", "")
 SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "")
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
+ALLOWED_ORIGINS = [origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",") if origin.strip()]
 
 # APP_MODE: heavy（默认）、lite 或 standard
 APP_MODE = os.getenv("APP_MODE", "heavy").lower().strip()

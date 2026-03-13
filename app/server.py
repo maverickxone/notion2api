@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from contextlib import asynccontextmanager
-from app.config import ACCOUNTS, API_KEY, is_lite_mode, is_standard_mode
+from app.config import ACCOUNTS, API_KEY, ALLOWED_ORIGINS, is_lite_mode, is_standard_mode
 from app.account_pool import AccountPool
 from app.conversation import ConversationManager
 from app.api.chat import router as chat_router
@@ -46,7 +46,7 @@ app = FastAPI(
 # 允许跨域（配合本地前端）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
