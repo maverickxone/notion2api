@@ -316,7 +316,7 @@ class NotionOpusAPI:
             )
             if response.status_code != 200:
                 excerpt = (response.text or "").strip().replace("\n", " ")[:300]
-                retriable = response.status_code >= 500 or response.status_code == 429
+                retriable = response.status_code >= 500  # 429 不再重试，避免账号被冷却
                 raise NotionUpstreamError(
                     f"Notion upstream returned HTTP {response.status_code}.",
                     status_code=response.status_code,

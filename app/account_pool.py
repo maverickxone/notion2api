@@ -63,7 +63,7 @@ class AccountPool:
                 "cooling": cooling,
             }
                     
-    def mark_failed(self, client: NotionOpusAPI, cooldown_seconds: int = 60):
+    def mark_failed(self, client: NotionOpusAPI, cooldown_seconds: int = 10):
         """
         标记某个客户端为临时不可用（默认冷却 60 秒后恢复）
         """

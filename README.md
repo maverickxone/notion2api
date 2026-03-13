@@ -2,7 +2,7 @@
 
 > Notion AI to OpenAI-Compatible API Wrapper
 
-🌐 English | [中文](./README.md)
+🌐 English | [中文](./README_CN.md)
 
 Notion2API wraps Notion AI as an OpenAI-compatible API, supporting direct use with Cherry Studio, Zotero, and other third-party clients, as well as existing frontend pages.
 
@@ -182,6 +182,8 @@ HOST_PORT=8080  # Use port 8080
 ---
 
 ## FAQ
+
+> For detailed error solutions, see [Issues & Troubleshooting](./issues.md)
 
 ### 1. Thinking panel not showing?
 

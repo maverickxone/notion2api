@@ -183,6 +183,8 @@ HOST_PORT=8080  # 使用 8080 端口
 
 ## 常见问题
 
+> 详细的错误解决方案，请查看 [问题排查指南](./issues_CN.md)
+
 ### 1. Thinking 面板不显示？
 
 确保使用 `APP_MODE=standard` 或 `heavy`，Lite 模式不支持 Thinking。
