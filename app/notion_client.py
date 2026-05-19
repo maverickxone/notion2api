@@ -10,7 +10,7 @@ import urllib3
 
 from app.logger import logger
 from app.model_registry import get_notion_model
-from app.stream_parser import parse_stream
+from app.stream_parser_safe import parse_stream
 
 # 禁用 SSL 警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
