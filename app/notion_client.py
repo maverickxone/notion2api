@@ -22,6 +22,10 @@ NOTION_CLIENT_VERSION = os.getenv("NOTION_CLIENT_VERSION", "23.13.20260228.0625"
 class NotionUpstreamError(RuntimeError):
     """Notion 上游请求失败或返回异常内容。"""
 
+    status_code: Optional[int]
+    retriable: bool
+    response_excerpt: str
+
     def __init__(
         self,
         message: str,
