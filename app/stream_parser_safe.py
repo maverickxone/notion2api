@@ -23,6 +23,7 @@ def parse_stream(response: requests.Response) -> Generator[dict[str, Any], None,
     content/final event arrives.
     """
     buffered_thinking: list[str] = []
+    yielded_content_parts: list[str] = []
     visible_content_seen = False
 
     for item in _parse_stream(response):
@@ -37,12 +38,34 @@ def parse_stream(response: requests.Response) -> Generator[dict[str, Any], None,
                 buffered_thinking.append(text)
             continue
 
-        if item_type in {"content", "final_content"} and str(item.get("text", "") or "").strip():
-            visible_content_seen = True
+        if item_type in {"content", "final_content"}:
+            text = str(item.get("text", "") or "")
+            if text.strip():
+                visible_content_seen = True
+                yielded_content_parts.append(text)
 
         yield item
 
-    if not visible_content_seen and buffered_thinking:
-        fallback_text = "".join(buffered_thinking).strip()
-        if fallback_text:
-            yield {"type": "content", "text": fallback_text}
+    if buffered_thinking:
+        thinking_text = "".join(buffered_thinking).strip()
+        if thinking_text:
+            yielded_text = "".join(yielded_content_parts).strip()
+            if not yielded_text:
+                yield {"type": "content", "text": thinking_text}
+            else:
+                # Normalize whitespace and lowercase to compare content
+                norm_thinking = " ".join(thinking_text.split()).lower()
+                norm_yielded = " ".join(yielded_text.split()).lower()
+                
+                is_duplicate = False
+                if norm_thinking in norm_yielded:
+                    is_duplicate = True
+                else:
+                    from difflib import SequenceMatcher
+                    ratio = SequenceMatcher(None, norm_thinking, norm_yielded).ratio()
+                    if ratio > 0.75:
+                        is_duplicate = True
+                
+                if not is_duplicate:
+                    # Append unique thinking text if it is not a duplication of already yielded content
+                    yield {"type": "content", "text": "\n\n" + thinking_text}
