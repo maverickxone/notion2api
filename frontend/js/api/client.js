@@ -9,6 +9,29 @@ window.NotionAI.API = window.NotionAI.API || {};
 
 window.NotionAI.API.Client = {
     /**
+     * Makes a GET request to the API
+     * @param {string} endpoint - API endpoint path
+     * @param {Object} options - Fetch options
+     * @returns {Promise<Response>} Fetch response
+     */
+    async get(endpoint, options = {}) {
+        const baseUrl = window.NotionAI.Core.State.get('baseUrl');
+        const apiKey = window.NotionAI.Core.State.get('apiKey');
+
+        const response = await fetch(`${baseUrl}${endpoint}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'X-Client-Type': window.NotionAI.Core.Constants.CLIENT_TYPE,
+                ...options.headers
+            },
+            ...options
+        });
+
+        return response;
+    },
+
+    /**
      * Makes a POST request to the API
      * @param {string} endpoint - API endpoint path
      * @param {Object} data - Request payload

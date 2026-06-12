@@ -107,6 +107,13 @@ body{background:var(--bg);color:var(--text)}
   border-left-color:var(--border-active);
   background:var(--bg-hover);
 }
+.chat-item.selected{
+  background:var(--bg-hover);
+  border-left-color:var(--border);
+}
+.chat-item.selected.active{
+  border-left-color:var(--border-active);
+}
 .chat-item-title{
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;
 }
@@ -294,6 +301,8 @@ body{background:var(--bg);color:var(--text)}
   <div id="inputAreaWrapper" class="input-area-wrapper">
     <div class="input-card">
       <textarea id="chatInput" rows="1" placeholder="Send a message..." class="chat-input"></textarea>
+      <div id="attachmentBar" class="attachment-bar hidden"></div>
+      <input id="attachmentInput" type="file" multiple class="hidden" />
       <div class="input-toolbar">
         <div class="toolbar-left">
           <div class="model-selector-container" id="modelSelectorContainer">
@@ -309,6 +318,9 @@ body{background:var(--bg);color:var(--text)}
           </div>
         </div>
         <div class="toolbar-right">
+          <button id="attachBtn" title="Attach files" class="attach-btn" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-8.49 8.49a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 115.66 5.66l-9.2 9.19a2 2 0 01-2.82-2.82l8.48-8.48"/></svg>
+          </button>
           <button id="sendBtn" title="Send (Enter)" class="send-btn">
             <svg id="sendIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             <svg id="stopIcon" class="hidden" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
@@ -332,6 +344,7 @@ body{background:var(--bg);color:var(--text)}
     <div class="modal-body">
       <div class="form-group"><label>Base URL</label><input type="text" id="baseUrlInput" placeholder="http://localhost:8000"></div>
       <div class="form-group"><label>API Key</label><input type="password" id="apiKeyInput" placeholder="Optional if not set on server"></div>
+      <div id="settingsWarningsContainer" class="settings-warnings-container hidden" style="margin-top:16px; padding:12px; border-radius:8px; background:rgba(217,48,37,0.06); border:1px solid rgba(217,48,37,0.15); display:flex; flex-direction:column; gap:8px;"></div>
     </div>
     <div class="modal-footer"><button id="saveSettingsBtn" class="btn-primary">Save changes</button></div>
   </div>
@@ -368,6 +381,24 @@ body{background:var(--bg);color:var(--text)}
 .toolbar-left{display:flex;align-items:center}
 .toolbar-right{display:flex;align-items:center}
 .input-footer{text-align:center;font-size:11px;color:var(--text-tertiary);margin-top:6px}
+
+.attachment-bar{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.attachment-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  max-width:100%;padding:4px 8px;border:1px solid var(--border);
+  border-radius:999px;background:var(--bg-secondary);font-size:12px;color:var(--text-secondary);
+}
+.attachment-chip-name{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.attachment-chip-remove{font-size:12px;line-height:1;padding:0 2px;color:var(--text-tertiary)}
+.attachment-chip-remove:hover{color:var(--text)}
+
+.attach-btn{
+  width:32px;height:32px;border-radius:8px;
+  border:1px solid var(--border);color:var(--text-secondary);
+  display:flex;align-items:center;justify-content:center;
+  margin-right:8px;transition:all .1s;
+}
+.attach-btn:hover{border-color:var(--border-hover);color:var(--text)}
 
 /* Model selector */
 .model-trigger-btn{
@@ -697,51 +728,62 @@ window.NotionAI.Core.Constants = {
     {label:'Anthropic',models:[
       {id:"claude-sonnet4.6",label:"Sonnet 4.6",provider:"Anthropic",desc:"Fast & efficient"},
       {id:"claude-opus4.6",label:"Opus 4.6",provider:"Anthropic"},
-      {id:"claude-opus4.7",label:"Opus 4.7",provider:"Anthropic"},
-      {id:"claude-opus4.8",label:"Opus 4.8",provider:"Anthropic"},
+      {id:"claude-opus4.7",label:"Opus 4.7",provider:"Anthropic",badge:"New"},
+      {id:"claude-opus4.8",label:"Opus 4.8",provider:"Anthropic",badge:"New"},
+      {id:"claude-haiku4.5",label:"Haiku 4.5",provider:"Anthropic"},
     ]},
     {label:'OpenAI',models:[
       {id:"gpt-5.2",label:"GPT-5.2",provider:"OpenAI"},
       {id:"gpt-5.4",label:"GPT-5.4",provider:"OpenAI"},
+      {id:"gpt-5.4mini",label:"GPT-5.4 Mini",provider:"OpenAI"},
+      {id:"gpt-5.4nano",label:"GPT-5.4 Nano",provider:"OpenAI"},
       {id:"gpt-5.5",label:"GPT-5.5",provider:"OpenAI",badge:"Beta"},
     ]},
     {label:'Google',models:[
       {id:"gemini-2.5flash",label:"Gemini 2.5 Flash",provider:"Google",desc:"No thinking delay"},
+      {id:"gemini-3flash",label:"Gemini 3 Flash",provider:"Google"},
+      {id:"gemini-3.5flash",label:"Gemini 3.5 Flash",provider:"Google",badge:"New"},
       {id:"gemini-3.1pro",label:"Gemini 3.1 Pro",provider:"Google"},
     ]},
     {label:'Moonshot',models:[
       {id:"kimi-2.6",label:"Kimi 2.6",provider:"Moonshot",badge:"Beta"},
     ]},
     {label:'xAI',models:[
-      {id:"grok-4.3",label:"Grok 4.3",provider:"xAI",badge:"New"},
-      {id:"grok-build0.1",label:"Grok Build 0.1",provider:"xAI",badge:"New"},
+      {id:"grok-4.3",label:"Grok 4.3",provider:"xAI",badge:"Beta"},
+      {id:"grok-build0.1",label:"Grok Build 0.1",provider:"xAI",badge:"Beta"},
     ]},
     {label:'DeepSeek',models:[
       {id:"deepseek-v4pro",label:"DeepSeek V4 Pro",provider:"DeepSeek",badge:"New"},
+    ]},
+    {label:'Other',models:[
+      {id:"minimax-m2.5",label:"MiniMax M2.5",provider:"MiniMax",badge:"Beta"},
     ]}
   ],
   MODELS:[
     {id:"claude-sonnet4.6",label:"Sonnet 4.6"},{id:"claude-opus4.6",label:"Opus 4.6"},
     {id:"claude-opus4.7",label:"Opus 4.7"},{id:"claude-opus4.8",label:"Opus 4.8"},
-    {id:"gpt-5.2",label:"GPT-5.2"},
-    {id:"gpt-5.4",label:"GPT-5.4"},{id:"gpt-5.5",label:"GPT-5.5"},
-    {id:"gemini-2.5flash",label:"Gemini 2.5 Flash"},{id:"gemini-3.1pro",label:"Gemini 3.1 Pro"},
-    {id:"kimi-2.6",label:"Kimi 2.6"},
+    {id:"claude-haiku4.5",label:"Haiku 4.5"},{id:"gpt-5.2",label:"GPT-5.2"},
+    {id:"gpt-5.4",label:"GPT-5.4"},{id:"gpt-5.4mini",label:"GPT-5.4 Mini"},
+    {id:"gpt-5.4nano",label:"GPT-5.4 Nano"},{id:"gpt-5.5",label:"GPT-5.5"},
+    {id:"gemini-2.5flash",label:"Gemini 2.5 Flash"},{id:"gemini-3flash",label:"Gemini 3 Flash"},
+    {id:"gemini-3.5flash",label:"Gemini 3.5 Flash"},{id:"gemini-3.1pro",label:"Gemini 3.1 Pro"},
     {id:"grok-4.3",label:"Grok 4.3"},{id:"grok-build0.1",label:"Grok Build 0.1"},
+    {id:"minimax-m2.5",label:"MiniMax M2.5"},{id:"kimi-2.6",label:"Kimi 2.6"},
     {id:"deepseek-v4pro",label:"DeepSeek V4 Pro"},
   ],
   DEFAULT_MODEL:"claude-sonnet4.6",
   MODEL_DISPLAY_NAMES:{
-    "claude-sonnet4.6":"Sonnet 4.6","claude-opus4.6":"Opus 4.6","claude-opus4.7":"Opus 4.7","claude-opus4.8":"Opus 4.8",
-    "gpt-5.2":"GPT-5.2","gpt-5.4":"GPT-5.4","gpt-5.5":"GPT-5.5",
-    "gemini-2.5flash":"Gemini 2.5 Flash","gemini-3.1pro":"Gemini 3.1 Pro","kimi-2.6":"Kimi 2.6",
-    "grok-4.3":"Grok 4.3","grok-build0.1":"Grok Build 0.1","deepseek-v4pro":"DeepSeek V4 Pro",
+    "claude-sonnet4.6":"Sonnet 4.6","claude-opus4.6":"Opus 4.6","claude-opus4.7":"Opus 4.7",
+    "claude-opus4.8":"Opus 4.8","claude-haiku4.5":"Haiku 4.5",
+    "gpt-5.2":"GPT-5.2","gpt-5.4":"GPT-5.4","gpt-5.4mini":"GPT-5.4 Mini","gpt-5.4nano":"GPT-5.4 Nano","gpt-5.5":"GPT-5.5",
+    "gemini-2.5flash":"Gemini 2.5 Flash","gemini-3flash":"Gemini 3 Flash","gemini-3.5flash":"Gemini 3.5 Flash","gemini-3.1pro":"Gemini 3.1 Pro",
+    "grok-4.3":"Grok 4.3","grok-build0.1":"Grok Build 0.1","minimax-m2.5":"MiniMax M2.5","kimi-2.6":"Kimi 2.6","deepseek-v4pro":"DeepSeek V4 Pro",
   },
   MODEL_PROVIDERS:{
-    "claude-sonnet4.6":"Anthropic","claude-opus4.6":"Anthropic","claude-opus4.7":"Anthropic","claude-opus4.8":"Anthropic",
-    "gpt-5.2":"OpenAI","gpt-5.4":"OpenAI","gpt-5.5":"OpenAI",
-    "gemini-2.5flash":"Google","gemini-3.1pro":"Google","kimi-2.6":"Moonshot",
-    "grok-4.3":"xAI","grok-build0.1":"xAI","deepseek-v4pro":"DeepSeek",
+    "claude-sonnet4.6":"Anthropic","claude-opus4.6":"Anthropic","claude-opus4.7":"Anthropic","claude-opus4.8":"Anthropic","claude-haiku4.5":"Anthropic",
+    "gpt-5.2":"OpenAI","gpt-5.4":"OpenAI","gpt-5.4mini":"OpenAI","gpt-5.4nano":"OpenAI","gpt-5.5":"OpenAI",
+    "gemini-2.5flash":"Google","gemini-3flash":"Google","gemini-3.5flash":"Google","gemini-3.1pro":"Google",
+    "grok-4.3":"xAI","grok-build0.1":"xAI","minimax-m2.5":"MiniMax","kimi-2.6":"Moonshot","deepseek-v4pro":"DeepSeek",
   },
   CLIENT_TYPE:'Web'
 };
@@ -752,7 +794,7 @@ window.NotionAI.Core.State = {
     baseUrl:localStorage.getItem('claude_base_url')||window.location.origin,
     apiKey:'',theme:localStorage.getItem('theme')||(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'),
     chats:JSON.parse(localStorage.getItem('claude_chats'))||[],
-    currentChatId:null,isGenerating:false,controller:null,modelDisplayNames:{},chatToRename:null
+    currentChatId:null,selectedChatIds:[],isGenerating:false,controller:null,modelDisplayNames:{},chatToRename:null,pendingAttachments:[]
   },
   loadStoredApiKey(){return localStorage.getItem('claude_api_key')||sessionStorage.getItem('claude_api_key')||''},
   persistApiKey(k){if(k){localStorage.setItem('claude_api_key',k);sessionStorage.setItem('claude_api_key',k)}else{localStorage.removeItem('claude_api_key');sessionStorage.removeItem('claude_api_key')}},
@@ -900,6 +942,10 @@ window.NotionAI.Utils.DOM = {
 <script>
 /* ===== API CLIENT ===== */
 window.NotionAI.API.Client = {
+  async get(endpoint,options={}){
+    const r=await fetch(`${window.NotionAI.Core.State.get('baseUrl')}${endpoint}`,{
+      method:'GET',headers:{'Authorization':`Bearer ${window.NotionAI.Core.State.get('apiKey')}`,'X-Client-Type':window.NotionAI.Core.Constants.CLIENT_TYPE,...options.headers},...options});return r;
+  },
   async post(endpoint,data,options={}){
     const r=await fetch(`${window.NotionAI.Core.State.get('baseUrl')}${endpoint}`,{
       method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${window.NotionAI.Core.State.get('apiKey')}`,'X-Client-Type':window.NotionAI.Core.Constants.CLIENT_TYPE,...options.headers},
@@ -928,9 +974,9 @@ window.NotionAI.API.Models = {
 
 /* ===== SETTINGS ===== */
 window.NotionAI.API.Settings = {
-  open(){document.getElementById('baseUrlInput').value=window.NotionAI.Core.State.get('baseUrl');document.getElementById('apiKeyInput').value=window.NotionAI.Core.State.get('apiKey');document.getElementById('settingsModal').classList.remove('hidden')},
+  open(){document.getElementById('baseUrlInput').value=window.NotionAI.Core.State.get('baseUrl');document.getElementById('apiKeyInput').value=window.NotionAI.Core.State.get('apiKey');document.getElementById('settingsModal').classList.remove('hidden'); if(typeof checkFeatures === 'function') checkFeatures();},
   close(){document.getElementById('settingsModal').classList.add('hidden')},
-  save(){const b=document.getElementById('baseUrlInput').value.trim().replace(/\/$/,"");const k=document.getElementById('apiKeyInput').value.trim();window.NotionAI.Core.State.set('baseUrl',b);window.NotionAI.Core.State.set('apiKey',k);localStorage.setItem('claude_base_url',b);window.NotionAI.Core.State.persistApiKey(k);this.close();window.NotionAI.API.Models.loadModels()}
+  save(){const b=document.getElementById('baseUrlInput').value.trim().replace(/\/$/,"");const k=document.getElementById('apiKeyInput').value.trim();window.NotionAI.Core.State.set('baseUrl',b);window.NotionAI.Core.State.set('apiKey',k);localStorage.setItem('claude_base_url',b);window.NotionAI.Core.State.persistApiKey(k);this.close();window.NotionAI.API.Models.loadModels(); if(typeof checkFeatures === 'function') checkFeatures();}
 };
 
 /* ===== STORAGE ===== */
@@ -1137,7 +1183,7 @@ window.NotionAI.Chat.Renderer = {
 <script>
 /* ===== STREAMING ===== */
 window.NotionAI.Chat.Streaming = {
-  async streamResponse(chat, model, aiWrapper) {
+  async streamResponse(chat, model, aiWrapper, attachments = []) {
     const searchState = { queries: [], sources: [] };
     let thinkingText = '', fullAiReply = '';
     const requestMessages = chat.messages.filter(m=>m&&typeof m==='object'&&(m.role==='user'||m.role==='assistant')).map(m=>({role:m.role,content:String(m.content||''),thinking:String(m.thinking||'')}));
@@ -1145,7 +1191,7 @@ window.NotionAI.Chat.Streaming = {
     try {
       const response = await fetch(`${window.NotionAI.Core.State.get('baseUrl')}/v1/chat/completions`, {
         method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${window.NotionAI.Core.State.get('apiKey')}`,'X-Client-Type':window.NotionAI.Core.Constants.CLIENT_TYPE},
-        body:JSON.stringify({model,messages:requestMessages,conversation_id:chat.conversationId||null,stream:true}), signal:STATE.controller.signal
+        body:JSON.stringify({model,messages:requestMessages,conversation_id:chat.conversationId||null,stream:true,attachments}), signal:STATE.controller.signal
       });
       if(window.NotionAI.API.Client.checkMemoryStatus(response))this.notifyMemoryDegradedOnce();
       const bid=window.NotionAI.API.Client.getConversationId(response);
@@ -1242,6 +1288,7 @@ window.NotionAI.Chat.Manager = {
     if(STATE.isGenerating)return;
     const id=Date.now().toString();
     window.NotionAI.Core.State.set('currentChatId',id);
+    window.NotionAI.Core.State.set('selectedChatIds',[id]);
     document.getElementById('headerTitle').classList.add('hidden');
     document.getElementById('chatContainer').innerHTML='';
     window.NotionAI.UI.Input.clear();
@@ -1256,6 +1303,10 @@ window.NotionAI.Chat.Manager = {
     if(STATE.isGenerating)return;
     const chats=STATE.chats,chat=chats.find(c=>c.id===chatId);if(!chat)return;
     window.NotionAI.Core.State.set('currentChatId',chatId);
+    const selected = window.NotionAI.Core.State.get('selectedChatIds') || [];
+    if (!selected.includes(chatId)) {
+      window.NotionAI.Core.State.set('selectedChatIds', [chatId]);
+    }
     document.getElementById('welcomeScreen').classList.add('hidden');
     document.getElementById('chatContainer').innerHTML='';
     document.getElementById('headerTitle').textContent=chat.title;
@@ -1273,13 +1324,87 @@ window.NotionAI.Chat.Manager = {
     window.NotionAI.Utils.DOM.scrollToBottom();
     this.renderChatList();
   },
+  handleChatClick(e, chatId) {
+    if(STATE.isGenerating)return;
+    const chats=STATE.chats;
+    const starred=chats.filter(c=>c.starred).sort((a,b)=>b.id-a.id);
+    const recent=chats.filter(c=>!c.starred).sort((a,b)=>b.id-a.id);
+    const searchVal=(document.getElementById('searchInput')?.value||'').trim().toLowerCase();
+    const filter=searchVal?c=>c.title.toLowerCase().includes(searchVal):null;
+    
+    const starredFiltered = filter ? starred.filter(filter) : starred;
+    const recentFiltered = filter ? recent.filter(filter) : recent;
+    const allRendered = [...starredFiltered, ...recentFiltered];
+    
+    let selected = [...(window.NotionAI.Core.State.get('selectedChatIds') || [])];
+    
+    if (e.ctrlKey || e.metaKey) {
+      if (selected.includes(chatId)) {
+        selected = selected.filter(id => id !== chatId);
+        window.NotionAI.Core.State.set('selectedChatIds', selected);
+        if (STATE.currentChatId === chatId) {
+          const nextActive = selected[selected.length - 1] || null;
+          if (nextActive) {
+            this.selectChat(nextActive);
+          } else {
+            this.startNewChat();
+          }
+        } else {
+          this.renderChatList();
+        }
+      } else {
+        selected.push(chatId);
+        window.NotionAI.Core.State.set('selectedChatIds', selected);
+        this.selectChat(chatId);
+      }
+    } else if (e.shiftKey) {
+      const endIdx = allRendered.findIndex(c => c.id === chatId);
+      let startIdx = allRendered.findIndex(c => c.id === STATE.currentChatId);
+      if (startIdx === -1) startIdx = 0;
+      
+      const minIdx = Math.min(startIdx, endIdx);
+      const maxIdx = Math.max(startIdx, endIdx);
+      const newSelected = [];
+      for (let i = minIdx; i <= maxIdx; i++) {
+        newSelected.push(allRendered[i].id);
+      }
+      window.NotionAI.Core.State.set('selectedChatIds', newSelected);
+      this.selectChat(chatId);
+    } else {
+      window.NotionAI.Core.State.set('selectedChatIds', [chatId]);
+      this.selectChat(chatId);
+    }
+  },
   async deleteChat(chatId) {
     if(STATE.isGenerating)return;
-    const chats=STATE.chats,chat=chats.find(c=>c.id===chatId);if(!chat)return;
-    if(chat.conversationId){const ok=await window.NotionAI.API.Client.deleteConversation(chat.conversationId);if(!ok)return}
-    window.NotionAI.Chat.Storage.deleteChat(chatId);
-    if(STATE.currentChatId===chatId)this.startNewChat();
-    this.renderChatList();
+    const selected = window.NotionAI.Core.State.get('selectedChatIds') || [];
+    const targets = selected.includes(chatId) ? selected : [chatId];
+    if(targets.length > 1) {
+      if(!confirm(`Delete ${targets.length} selected chats?`)) return;
+    } else {
+      const chats=STATE.chats,chat=chats.find(c=>c.id===chatId);if(!chat)return;
+      if(!confirm(`Delete chat "${chat.title}"?`)) return;
+    }
+    for(const id of targets) {
+      const chats=STATE.chats,chat=chats.find(c=>c.id===id);
+      if(chat) {
+        if(chat.conversationId){
+          try{await window.NotionAI.API.Client.deleteConversation(chat.conversationId);}catch(e){}
+        }
+        window.NotionAI.Chat.Storage.deleteChat(id);
+      }
+    }
+    const newSelected = selected.filter(id => !targets.includes(id));
+    window.NotionAI.Core.State.set('selectedChatIds', newSelected);
+    if(targets.includes(STATE.currentChatId)) {
+      if(newSelected.length > 0) {
+        this.selectChat(newSelected[newSelected.length - 1]);
+      } else {
+        this.startNewChat();
+      }
+    } else {
+      this.renderChatList();
+    }
   },
   renameChat(chatId,newTitle) {
     window.NotionAI.Chat.Storage.updateChatTitle(chatId,newTitle);
@@ -1299,8 +1424,10 @@ window.NotionAI.Chat.Manager = {
       let filtered=filterFn?items.filter(filterFn):items;
       filtered.forEach(chat=>{
         const item=document.createElement('div');
-        item.className=`chat-item${chat.id===STATE.currentChatId?' active':''}`;
-        item.onclick=()=>this.selectChat(chat.id);
+        const selected = window.NotionAI.Core.State.get('selectedChatIds') || [];
+        const isSelected = selected.includes(chat.id);
+        item.className=`chat-item${chat.id===STATE.currentChatId?' active':''}${isSelected?' selected':''}`;
+        item.onclick=e=>this.handleChatClick(e,chat.id);
         const title=document.createElement('span');title.className='chat-item-title';title.textContent=chat.title;
         const mc=document.createElement('div');mc.className='chat-dropdown-container';mc.style.cssText='position:relative;display:flex;align-items:center';
         const mb=document.createElement('button');mb.className='chat-item-menu-btn';
@@ -1582,6 +1709,63 @@ function _updateSendButton(isGen){
   else{btn.classList.remove('is-generating');si.classList.remove('hidden');sti.classList.add('hidden');btn.title='Send (Enter)'}
 }
 
+function _readFileAsDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result||''));
+    reader.onerror=()=>reject(reader.error||new Error('File read failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function _renderAttachmentBar(){
+  const bar=document.getElementById('attachmentBar');
+  if(!bar)return;
+  const attachments=STATE.pendingAttachments||[];
+  if(!attachments.length){
+    bar.classList.add('hidden');
+    bar.innerHTML='';
+    return;
+  }
+  bar.classList.remove('hidden');
+  bar.innerHTML='';
+  attachments.forEach((att,idx)=>{
+    const chip=document.createElement('div');
+    chip.className='attachment-chip';
+    const name=document.createElement('span');
+    name.className='attachment-chip-name';
+    name.textContent=att.name||`file-${idx+1}`;
+    const remove=document.createElement('button');
+    remove.type='button';
+    remove.className='attachment-chip-remove';
+    remove.title='Remove attachment';
+    remove.textContent='×';
+    remove.onclick=()=>{
+      STATE.pendingAttachments=(STATE.pendingAttachments||[]).filter((_,i)=>i!==idx);
+      _renderAttachmentBar();
+    };
+    chip.appendChild(name);
+    chip.appendChild(remove);
+    bar.appendChild(chip);
+  });
+}
+
+async function _handleAttachmentPick(event){
+  const input=event?.target;
+  const files=Array.from(input?.files||[]);
+  if(!files.length)return;
+  for(const file of files){
+    const data=await _readFileAsDataUrl(file);
+    (STATE.pendingAttachments||[]).push({
+      name:file.name,
+      content_type:file.type||'application/octet-stream',
+      data,
+    });
+  }
+  input.value='';
+  _renderAttachmentBar();
+}
+
 // Header title inline editing
 function setupHeaderTitleEditing(){
   const ht=document.getElementById('headerTitle');
@@ -1625,13 +1809,19 @@ function setupSidebarResize(){
 
 async function handleSend(){
   if(STATE.isGenerating)return;
-  const text=window.NotionAI.UI.Input.getValue();if(!text)return;
+  const text=window.NotionAI.UI.Input.getValue();
+  const hasAttachments=Array.isArray(STATE.pendingAttachments)&&STATE.pendingAttachments.length>0;
+  if(!text&&!hasAttachments)return;
+  const attachmentsToSend=(STATE.pendingAttachments||[]).map(a=>({name:a.name,content_type:a.content_type,data:a.data}));
+  const userText=text||'Please analyze the attached files.';
   let chat=STATE.chats.find(c=>c.id===STATE.currentChatId);
-  if(!chat){chat={id:STATE.currentChatId,title:text.length>30?text.substring(0,30)+'...':text,messages:[],conversationId:null};STATE.chats.push(chat);document.getElementById('headerTitle').textContent=chat.title;document.getElementById('headerTitle').classList.remove('hidden')}
+  if(!chat){chat={id:STATE.currentChatId,title:userText.length>30?userText.substring(0,30)+'...':userText,messages:[],conversationId:null};STATE.chats.push(chat);document.getElementById('headerTitle').textContent=chat.title;document.getElementById('headerTitle').classList.remove('hidden')}
   window.NotionAI.UI.Input.clear();
+  STATE.pendingAttachments=[];
+  _renderAttachmentBar();
   document.getElementById('welcomeScreen').classList.add('hidden');
-  chat.messages.push({role:'user',content:text});
-  window.NotionAI.Chat.Renderer.appendMessage('user',text,true);
+  chat.messages.push({role:'user',content:userText});
+  window.NotionAI.Chat.Renderer.appendMessage('user',userText,true);
   window.NotionAI.Chat.Storage.saveChats();
   window.NotionAI.Chat.Manager.renderChatList();
   window.NotionAI.Utils.DOM.scrollToBottom();
@@ -1651,7 +1841,7 @@ async function handleSend(){
     const timerEl=aiWrapper.thinkingCardRef?.querySelector('.thinking-header-timer');
     if(timerEl)aiWrapper._thinkingTimerInterval=setInterval(()=>{if(aiWrapper._thinkingStartTime)timerEl.textContent=Math.round((Date.now()-aiWrapper._thinkingStartTime)/1000)+'s'},1000);
     window.NotionAI.Utils.DOM.scrollToBottom();
-    const result=await window.NotionAI.Chat.Streaming.streamResponse(chat,selectedModel,aiWrapper);
+    const result=await window.NotionAI.Chat.Streaming.streamResponse(chat,selectedModel,aiWrapper,attachmentsToSend);
     removeThinkingIndicator();
     if(aiWrapper._thinkingTimerInterval){clearInterval(aiWrapper._thinkingTimerInterval);aiWrapper._thinkingTimerInterval=null}
     const ns=window.NotionAI.Utils.Validation.normalizeSearchPayload(result.searchState);
@@ -1662,6 +1852,105 @@ async function handleSend(){
     }else{window.NotionAI.Chat.Renderer.updateAIMessage(aiWrapper,'*No visible response received.*',true)}
   }catch(err){removeThinkingIndicator();if(aiWrapper?._thinkingTimerInterval)clearInterval(aiWrapper._thinkingTimerInterval);if(err.name!=='AbortError')console.error('API Error:',err)}
   finally{window.NotionAI.Chat.Streaming.consumePayload=origConsume;STATE.isGenerating=false;window.NotionAI.UI.Input.enable();window.NotionAI.UI.Input.focus();STATE.controller=null;_updateSendButton(false)}
+}
+
+window.NotionAI.UI.UpdateAttachmentsUX = function(attachments) {
+  const enabled = attachments?.enabled;
+  const attachBtn = document.getElementById('attachBtn');
+  const attachmentInput = document.getElementById('attachmentInput');
+  
+  const existingWarning = document.getElementById('attachmentWarningMsg');
+  if (existingWarning) {
+    existingWarning.parentNode.removeChild(existingWarning);
+  }
+  
+  if (enabled === false) {
+    if (attachBtn) {
+      attachBtn.disabled = true;
+      attachBtn.style.opacity = '0.5';
+      attachBtn.style.cursor = 'not-allowed';
+      attachBtn.title = 'File uploads disabled. Set ENABLE_ATTACHMENTS=true.';
+    }
+    if (attachmentInput) {
+      attachmentInput.disabled = true;
+    }
+    
+    const warningDiv = document.createElement('div');
+    warningDiv.id = 'attachmentWarningMsg';
+    warningDiv.style.fontSize = '12px';
+    warningDiv.style.color = '#d93025';
+    warningDiv.style.marginTop = '6px';
+    warningDiv.style.display = 'flex';
+    warningDiv.style.alignItems = 'center';
+    warningDiv.style.gap = '6px';
+    warningDiv.innerHTML = '<span style="font-size:14px">⚠️</span> <span>File uploads disabled. Set <code>ENABLE_ATTACHMENTS=true</code>.</span>';
+    
+    const toolbar = document.querySelector('.input-toolbar');
+    if (toolbar) {
+      toolbar.parentNode.insertBefore(warningDiv, toolbar);
+    }
+  } else {
+    if (attachBtn) {
+      attachBtn.disabled = false;
+      attachBtn.style.opacity = '';
+      attachBtn.style.cursor = '';
+      attachBtn.title = 'Attach files';
+    }
+    if (attachmentInput) {
+      attachmentInput.disabled = false;
+    }
+  }
+  
+  renderSettingsWarnings(attachments?.warnings || []);
+};
+
+async function checkFeatures() {
+  try {
+    const response = await window.NotionAI.API.Client.get('/v1/features');
+    if (!response.ok) {
+      console.error('Failed to fetch features status:', response.status);
+      return;
+    }
+    const data = await response.json();
+    STATE.features = data;
+    
+    if (window.NotionAI.UI.UpdateAttachmentsUX) {
+      window.NotionAI.UI.UpdateAttachmentsUX(data?.attachments);
+    }
+  } catch (err) {
+    console.error('Error checking features:', err);
+  }
+}
+
+function renderSettingsWarnings(warnings) {
+  const container = document.getElementById('settingsWarningsContainer');
+  if (!container) return;
+  
+  if (!warnings || warnings.length === 0) {
+    container.classList.add('hidden');
+    container.innerHTML = '';
+    return;
+  }
+  
+  container.classList.remove('hidden');
+  container.innerHTML = '<div style="font-weight:600; color:#c5221f; font-size:13px; margin-bottom:4px; display:flex; align-items:center; gap:6px;"><span>⚠️</span> Configuration Warnings</div>';
+  
+  const list = document.createElement('ul');
+  list.style.margin = '0';
+  list.style.paddingLeft = '18px';
+  list.style.fontSize = '12px';
+  list.style.color = '#5f6368';
+  list.style.lineHeight = '1.5';
+  
+  warnings.forEach(warning => {
+    const item = document.createElement('li');
+    item.style.marginBottom = '4px';
+    const formatted = warning.replace(/`([^`]+)`/g, '<code>$1</code>');
+    item.innerHTML = formatted;
+    list.appendChild(item);
+  });
+  
+  container.appendChild(list);
 }
 
 function init(){
@@ -1675,6 +1964,7 @@ function init(){
   populateModels();
   setupHeaderTitleEditing();
   setupSidebarResize();
+  checkFeatures();
 
   // Event listeners
   document.getElementById('themeToggleBtn').addEventListener('click',()=>window.NotionAI.UI.Theme.toggle());
@@ -1683,6 +1973,8 @@ function init(){
   document.getElementById('mobileBackdrop').addEventListener('click',()=>window.NotionAI.UI.Sidebar.close());
   document.getElementById('chatInput').addEventListener('input',()=>window.NotionAI.UI.Input.autoResize());
   document.getElementById('chatInput').addEventListener('keydown',e=>window.NotionAI.UI.Input.handleKeydown(e,handleSend));
+  document.getElementById('attachBtn').addEventListener('click',()=>document.getElementById('attachmentInput').click());
+  document.getElementById('attachmentInput').addEventListener('change',e=>{_handleAttachmentPick(e).catch(err=>console.error('Attachment read error:',err))});
   document.getElementById('sendBtn').addEventListener('click',()=>{if(STATE.isGenerating){if(STATE.controller)STATE.controller.abort()}else handleSend()});
   document.getElementById('memoryBannerClose').addEventListener('click',()=>document.getElementById('memoryBanner').classList.add('hidden'));
   document.getElementById('settingsBtn').addEventListener('click',()=>window.NotionAI.API.Settings.open());
@@ -1694,6 +1986,27 @@ function init(){
   document.getElementById('modelTriggerBtn').addEventListener('click',e=>{e.stopPropagation();toggleModelDropdown()});
   document.addEventListener('click',e=>{const dd=document.getElementById('customModelDropdown');if(!dd.contains(e.target)&&e.target.id!=='modelTriggerBtn')dd.classList.remove('open')});
   document.getElementById('searchInput').addEventListener('input',()=>window.NotionAI.Chat.Manager.renderChatList());
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Delete') {
+      const activeEl = document.activeElement;
+      const isInput = activeEl ? (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable) : false;
+      if (!isInput) {
+        const currentChatId = window.NotionAI.Core.State.get('currentChatId');
+        if (currentChatId && currentChatId.startsWith('remote-chat-history:')) {
+          if (window.NotionAI.ChatHistoryMain) {
+            e.preventDefault();
+            window.NotionAI.ChatHistoryMain.deleteSelectedRemoteThreads();
+          }
+        } else {
+          const selected = window.NotionAI.Core.State.get('selectedChatIds') || [];
+          if (selected.length > 0) {
+            e.preventDefault();
+            window.NotionAI.Chat.Manager.deleteChat(selected[0]);
+          }
+        }
+      }
+    }
+  });
 
   if(!STATE.currentChatId)window.NotionAI.Chat.Manager.startNewChat();
 }

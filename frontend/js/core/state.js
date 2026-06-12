@@ -15,6 +15,7 @@ window.NotionAI.Core.State = {
         theme: localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
         chats: JSON.parse(localStorage.getItem('claude_chats')) || [],
         currentChatId: null,
+        selectedChatIds: [],
         isGenerating: false,
         controller: null,
         modelDisplayNames: {},

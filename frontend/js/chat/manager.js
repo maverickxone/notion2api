@@ -11,6 +11,7 @@ window.NotionAI.Chat.Manager = {
 
         const currentChatId = Date.now().toString();
         window.NotionAI.Core.State.set('currentChatId', currentChatId);
+        window.NotionAI.Core.State.set('selectedChatIds', [currentChatId]);
 
         document.getElementById('headerTitle').classList.add('hidden');
         document.getElementById('chatContainer').innerHTML = '';
@@ -35,6 +36,10 @@ window.NotionAI.Chat.Manager = {
         if (!chat) return;
 
         window.NotionAI.Core.State.set('currentChatId', chatId);
+        const selected = window.NotionAI.Core.State.get('selectedChatIds') || [];
+        if (!selected.includes(chatId)) {
+            window.NotionAI.Core.State.set('selectedChatIds', [chatId]);
+        }
 
         document.getElementById('welcomeScreen').classList.add('hidden');
         document.getElementById('chatContainer').innerHTML = '';
@@ -74,26 +79,100 @@ window.NotionAI.Chat.Manager = {
         this.renderChatList();
     },
 
+    handleChatClick(e, chatId) {
+        if (window.NotionAI.Core.State.get('isGenerating')) return;
+        const chats = window.NotionAI.Core.State.get('chats');
+        const starred = chats.filter(c => c.starred).sort((a, b) => b.id - a.id);
+        const recent = chats.filter(c => !c.starred).sort((a, b) => b.id - a.id);
+        const searchVal = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+        const filter = searchVal ? c => c.title.toLowerCase().includes(searchVal) : null;
+        
+        const starredFiltered = filter ? starred.filter(filter) : starred;
+        const recentFiltered = filter ? recent.filter(filter) : recent;
+        const allRendered = [...starredFiltered, ...recentFiltered];
+        
+        let selected = [...(window.NotionAI.Core.State.get('selectedChatIds') || [])];
+        
+        if (e.ctrlKey || e.metaKey) {
+            if (selected.includes(chatId)) {
+                selected = selected.filter(id => id !== chatId);
+                window.NotionAI.Core.State.set('selectedChatIds', selected);
+                if (window.NotionAI.Core.State.get('currentChatId') === chatId) {
+                    const nextActive = selected[selected.length - 1] || null;
+                    if (nextActive) {
+                        this.selectChat(nextActive);
+                    } else {
+                        this.startNewChat();
+                    }
+                } else {
+                    this.renderChatList();
+                }
+            } else {
+                selected.push(chatId);
+                window.NotionAI.Core.State.set('selectedChatIds', selected);
+                this.selectChat(chatId);
+            }
+        } else if (e.shiftKey) {
+            const endIdx = allRendered.findIndex(c => c.id === chatId);
+            let startIdx = allRendered.findIndex(c => c.id === window.NotionAI.Core.State.get('currentChatId'));
+            if (startIdx === -1) startIdx = 0;
+            
+            const minIdx = Math.min(startIdx, endIdx);
+            const maxIdx = Math.max(startIdx, endIdx);
+            const newSelected = [];
+            for (let i = minIdx; i <= maxIdx; i++) {
+                newSelected.push(allRendered[i].id);
+            }
+            window.NotionAI.Core.State.set('selectedChatIds', newSelected);
+            this.selectChat(chatId);
+        } else {
+            window.NotionAI.Core.State.set('selectedChatIds', [chatId]);
+            this.selectChat(chatId);
+        }
+    },
+
     async deleteChat(chatId) {
         if (window.NotionAI.Core.State.get('isGenerating')) return;
 
-        const chats = window.NotionAI.Core.State.get('chats');
-        const chat = chats.find(c => c.id === chatId);
-        if (!chat) return;
-
-        if (chat.conversationId) {
-            const deleted = await window.NotionAI.API.Client.deleteConversation(chat.conversationId);
-            if (!deleted) return;
+        const selected = window.NotionAI.Core.State.get('selectedChatIds') || [];
+        const targets = selected.includes(chatId) ? selected : [chatId];
+        if (targets.length > 1) {
+            if (!confirm(`Delete ${targets.length} selected chats?`)) return;
+        } else {
+            const chats = window.NotionAI.Core.State.get('chats');
+            const chat = chats.find(c => c.id === chatId);
+            if (!chat) return;
+            if (!confirm(`Delete chat "${chat.title}"?`)) return;
         }
 
-        window.NotionAI.Chat.Storage.deleteChat(chatId);
+        for (const id of targets) {
+            const chats = window.NotionAI.Core.State.get('chats');
+            const chat = chats.find(c => c.id === id);
+            if (chat) {
+                if (chat.conversationId) {
+                    try {
+                        await window.NotionAI.API.Client.deleteConversation(chat.conversationId);
+                    } catch (e) {
+                        console.warn(`Failed to delete conversation ${chat.conversationId} on backend:`, e);
+                    }
+                }
+                window.NotionAI.Chat.Storage.deleteChat(id);
+            }
+        }
+
+        const newSelected = selected.filter(id => !targets.includes(id));
+        window.NotionAI.Core.State.set('selectedChatIds', newSelected);
 
         const currentChatId = window.NotionAI.Core.State.get('currentChatId');
-        if (currentChatId === chatId) {
-            this.startNewChat();
+        if (targets.includes(currentChatId)) {
+            if (newSelected.length > 0) {
+                this.selectChat(newSelected[newSelected.length - 1]);
+            } else {
+                this.startNewChat();
+            }
+        } else {
+            this.renderChatList();
         }
-
-        this.renderChatList();
     },
 
     renameChat(chatId, newTitle) {
@@ -125,8 +204,10 @@ window.NotionAI.Chat.Manager = {
         const renderItems = (items) => {
             items.forEach(chat => {
                 const item = document.createElement('div');
-                item.className = `chat-item${chat.id === currentChatId ? ' active' : ''}`;
-                item.onclick = () => this.selectChat(chat.id);
+                const selected = window.NotionAI.Core.State.get('selectedChatIds') || [];
+                const isSelected = selected.includes(chat.id);
+                item.className = `chat-item${chat.id === currentChatId ? ' active' : ''}${isSelected ? ' selected' : ''}`;
+                item.onclick = (e) => this.handleChatClick(e, chat.id);
 
                 const title = document.createElement('span');
                 title.className = 'chat-item-title';

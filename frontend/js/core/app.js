@@ -248,6 +248,28 @@ function bindEventListeners() {
             dropdown.classList.remove('open');
         }
     });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Delete') {
+            const activeEl = document.activeElement;
+            const isInput = activeEl ? (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable) : false;
+            if (!isInput) {
+                const currentChatId = window.NotionAI.Core.State.get('currentChatId');
+                if (currentChatId && currentChatId.startsWith('remote-chat-history:')) {
+                    if (window.NotionAI.ChatHistoryMain) {
+                        e.preventDefault();
+                        window.NotionAI.ChatHistoryMain.deleteSelectedRemoteThreads();
+                    }
+                } else {
+                    const selected = window.NotionAI.Core.State.get('selectedChatIds') || [];
+                    if (selected.length > 0) {
+                        e.preventDefault();
+                        window.NotionAI.Chat.Manager.deleteChat(selected[0]);
+                    }
+                }
+            }
+        }
+    });
 }
 
 // ─── Model Dropdown (Grouped) ─────────────────────────────────
