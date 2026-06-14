@@ -632,13 +632,10 @@ def _create_standard_stream_generator(
     stream_gen: Iterable[Any],
 ) -> Generator[str, None, None]:
     """
-    Standard 模式流式生成器：使用前端定义的 SSE 事件类型
+    Standard 模式流式生成器：保持 OpenAI-compatible SSE chunk
 
-    前端协议：
-    - thinking_chunk: 流式思考片段
-    - thinking_replace: 完整思考替换
-    - search_metadata: 搜索结果
-    - choices[0].delta.content: 正文内容
+    Thinking 通过 choices[0].delta.reasoning_content 输出；搜索结果作为
+    带 choices 的扩展 chunk 输出，避免 OpenAI-compatible 客户端校验失败。
     """
     streamed_content_accumulator = ""
     streamed_thinking_accumulator = ""
@@ -662,13 +659,16 @@ def _create_standard_stream_generator(
                     )
                 continue
 
-            # Standard 模式：处理 thinking（使用前端定义的 thinking_chunk 类型）
+            # Standard 模式：处理 thinking（使用 OpenAI-compatible chunk）
             if item_type == "thinking":
                 thinking_text = item.get("text", "")
                 if thinking_text:
                     streamed_thinking_accumulator += thinking_text
-                    # 输出 thinking_chunk 事件
-                    yield f"data: {json.dumps({'type': 'thinking_chunk', 'text': thinking_text}, ensure_ascii=False)}\n\n"
+                    yield _build_stream_chunk(
+                        response_id,
+                        model_name,
+                        thinking=thinking_text,
+                    )
                 continue
 
             # Standard 模式：处理 search（收集起来，最后输出）
@@ -780,16 +780,17 @@ def _create_standard_stream_generator(
                     )
                 streamed_content_accumulator = final_reply
 
-        # 输出搜索结果（使用前端定义的 search_metadata 类型）
+        # 输出搜索结果（保留扩展字段，但保持 OpenAI-compatible chunk 形状）
         if collected_search_sources or collected_search_queries:
-            search_metadata = {
-                "type": "search_metadata",
-                "searches": {
+            yield _build_local_ui_chunk(
+                response_id,
+                model_name,
+                "search_metadata",
+                searches={
                     "queries": collected_search_queries,
                     "sources": collected_search_sources,
                 },
-            }
-            yield f"data: {json.dumps(search_metadata, ensure_ascii=False)}\n\n"
+            )
 
         yield _build_stream_chunk(response_id, model_name, finish_reason="stop")
         yield "data: [DONE]\n\n"
