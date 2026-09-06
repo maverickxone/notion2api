@@ -704,6 +704,7 @@ window.NotionAI.Core.Constants = {
       {id:"claude-haiku4.5",label:"Haiku 4.5",provider:"Anthropic"},
     ]},
     {label:'OpenAI',models:[
+      {id:"gpt-6-astra",label:"GPT-6 Astra",provider:"OpenAI",badge:"New"},
       {id:"gpt-5.6-sol",label:"GPT-5.6 Sol",provider:"OpenAI",badge:"New"},
       {id:"gpt-5.6-terra",label:"GPT-5.6 Terra",provider:"OpenAI",badge:"New"},
       {id:"gpt-5.6-luna",label:"GPT-5.6 Luna",provider:"OpenAI",badge:"New"},
@@ -736,6 +737,7 @@ window.NotionAI.Core.Constants = {
   MODELS:[
     {id:"claude-sonnet4.6",label:"Sonnet 4.6"},{id:"claude-sonnet5",label:"Sonnet 5"},{id:"claude-opus4.6",label:"Opus 4.6"},
     {id:"claude-opus4.7",label:"Opus 4.7"},{id:"claude-opus4.8",label:"Opus 4.8"},{id:"claude-opus5",label:"Opus 5"},{id:"claude-haiku4.5",label:"Haiku 4.5"},
+    {id:"gpt-6-astra",label:"GPT-6 Astra"},
     {id:"gpt-5.6-sol",label:"GPT-5.6 Sol"},{id:"gpt-5.6-terra",label:"GPT-5.6 Terra"},{id:"gpt-5.6-luna",label:"GPT-5.6 Luna"},
     {id:"gpt-5.4",label:"GPT-5.4"},{id:"gpt-5.5",label:"GPT-5.5"},
     {id:"gemini-3.5flash",label:"Gemini 3.5 Flash"},{id:"gemini-3.1pro",label:"Gemini 3.1 Pro"},{id:"gemini-3flash",label:"Gemini 3 Flash"},
@@ -746,12 +748,14 @@ window.NotionAI.Core.Constants = {
   DEFAULT_MODEL:"claude-sonnet4.6",
   MODEL_DISPLAY_NAMES:{
     "claude-sonnet4.6":"Sonnet 4.6","claude-sonnet5":"Sonnet 5","claude-opus4.6":"Opus 4.6","claude-opus4.7":"Opus 4.7","claude-opus4.8":"Opus 4.8","claude-opus5":"Opus 5","claude-haiku4.5":"Haiku 4.5",
+    "gpt-6-astra":"GPT-6 Astra",
     "gpt-5.6-sol":"GPT-5.6 Sol","gpt-5.6-terra":"GPT-5.6 Terra","gpt-5.6-luna":"GPT-5.6 Luna","gpt-5.4":"GPT-5.4","gpt-5.5":"GPT-5.5",
     "gemini-3.5flash":"Gemini 3.5 Flash","gemini-3.1pro":"Gemini 3.1 Pro","gemini-3flash":"Gemini 3 Flash","kimi-2.7":"Kimi K2.7 Code",
     "grok-4.3":"Grok 4.3","spacexai-4.5":"SpaceXAI 4.5","grok-build0.1":"Grok Build 0.1","deepseek-v4pro":"DeepSeek V4 Pro","glm-5.2":"GLM 5.2","fable-5":"Fable 5",
   },
   MODEL_PROVIDERS:{
     "claude-sonnet4.6":"Anthropic","claude-sonnet5":"Anthropic","claude-opus4.6":"Anthropic","claude-opus4.7":"Anthropic","claude-opus4.8":"Anthropic","claude-opus5":"Anthropic","claude-haiku4.5":"Anthropic",
+    "gpt-6-astra":"OpenAI",
     "gpt-5.6-sol":"OpenAI","gpt-5.6-terra":"OpenAI","gpt-5.6-luna":"OpenAI","gpt-5.4":"OpenAI","gpt-5.5":"OpenAI",
     "gemini-3.5flash":"Google","gemini-3.1pro":"Google","gemini-3flash":"Google","kimi-2.7":"Moonshot",
     "grok-4.3":"xAI","spacexai-4.5":"xAI","grok-build0.1":"xAI","deepseek-v4pro":"DeepSeek","glm-5.2":"Zhipu","fable-5":"Notion",
