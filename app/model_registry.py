@@ -21,6 +21,7 @@ MODEL_MAP: dict[str, str] = {
     "claude-haiku4.5": "anthropic-haiku-4.5",
     "fable-5": "acai-budino-high",
     "gemini-3flash": "gingerbread",
+    "gpt-6-astra": "orlando-quinn",
 }
 
 NOTION_MODEL_REVERSE_MAP: dict[str, str] = {value: key for key, value in MODEL_MAP.items()}
@@ -48,6 +49,7 @@ DISPLAY_NAMES: dict[str, str] = {
     "claude-haiku4.5": "Haiku 4.5",
     "fable-5": "Fable 5",
     "gemini-3flash": "Gemini 3 Flash",
+    "gpt-6-astra": "GPT-6 Astra",
 }
 
 MODEL_ICONS: dict[str, str] = {
@@ -73,6 +75,7 @@ MODEL_ICONS: dict[str, str] = {
     "claude-haiku4.5": "✳️",
     "fable-5": "◇",
     "gemini-3flash": "✦",
+    "gpt-6-astra": "⚙",
 }
 
 # 默认使用 Sonnet 4.6（速度和质量的最佳平衡）
