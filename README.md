@@ -6,7 +6,7 @@
 
 Notion2API 对 Notion AI 网页接口进行逆向工程，将其封装为标准的 `/v1/chat/completions` 端点，可直接用于 Cherry Studio、Zotero 以及任何兼容 OpenAI 的客户端。
 
-2026.07.25：模型列表已同步至 22 个，新增 Claude Opus 5（`agave-flan`）。
+2026.09.06：模型列表已同步至 23 个，新增 GPT-6 Astra（`orlando-quinn`）。
 
 ---
 
@@ -14,7 +14,7 @@ Notion2API 对 Notion AI 网页接口进行逆向工程，将其封装为标准�
 
 - **OpenAI 兼容** — 标准 `/v1/chat/completions` 端点，支持流式（SSE）和非流式响应
 - **三种运行模式** — Lite / Standard / Heavy，满足不同使用场景
-- **22 个 AI 模型** — Claude（含 Opus 5）、GPT-5.x、Gemini、Kimi、Grok、DeepSeek、GLM、Fable
+- **23 个 AI 模型** — Claude（含 Opus 5）、GPT-6 Astra、GPT-5.x、Gemini、Kimi、Grok、DeepSeek、GLM、Fable
 - **Thinking 面板** — 所有模型均支持推理过程展示
 - **Search 面板** — 展示 Web 搜索查询和来源链接
 - **多账号池** — Round-Robin 负载均衡，带冷却故障转移
@@ -133,6 +133,7 @@ uvicorn app.server:app --host 0.0.0.0 --port 8000
 | `claude-opus4.8` | 强推理 Claude |
 | `claude-opus5` | 最新 Claude Opus，推理能力最强 |
 | `claude-haiku4.5` | Haiku 4.5 |
+| `gpt-6-astra` | GPT-6 Astra |
 | `gpt-5.6-sol` | GPT-5.6 Sol |
 | `gpt-5.6-terra` | GPT-5.6 Terra |
 | `gpt-5.6-luna` | GPT-5.6 Luna |

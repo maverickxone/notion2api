@@ -1,6 +1,6 @@
 import time
 from typing import Any, Dict, List, Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # ================================
 # 请求相关 Schema (Chat Completion)
@@ -11,6 +11,25 @@ class ChatMessage(BaseModel):
     role: Literal["user", "assistant", "system"]
     content: str
     thinking: Optional[str] = None
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def _coerce_content_parts(cls, v):
+        # OpenAI-style content parts (отправляют omp и др. клиенты) → plain text.
+        # Не-текстовые части (image_url и т.п.) мост не поддерживает и молча отбрасывает.
+        if v is None:
+            return ""
+        if isinstance(v, str):
+            return v
+        if isinstance(v, list):
+            texts = []
+            for part in v:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    texts.append(part.get("text") or "")
+                elif isinstance(part, str):
+                    texts.append(part)
+            return "".join(texts)
+        return str(v)
 
 class ChatCompletionRequest(BaseModel):
     """

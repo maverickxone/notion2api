@@ -35,6 +35,7 @@ window.NotionAI.Core.Constants = {
         {
             label: 'OpenAI',
             models: [
+                { id: "gpt-6-astra", label: "GPT-6 Astra", icon: "⚙", badge: "New" },
                 { id: "gpt-5.6-sol", label: "GPT-5.6 Sol", icon: "⚙", badge: "New" },
                 { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", icon: "⚙", badge: "New" },
                 { id: "gpt-5.6-luna", label: "GPT-5.6 Luna", icon: "⚙", badge: "New" },
@@ -93,6 +94,7 @@ window.NotionAI.Core.Constants = {
         { id: "claude-opus4.8", label: "Opus 4.8" },
         { id: "claude-opus5", label: "Opus 5" },
         { id: "claude-haiku4.5", label: "Haiku 4.5" },
+        { id: "gpt-6-astra", label: "GPT-6 Astra" },
         { id: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
         { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
         { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
@@ -120,6 +122,7 @@ window.NotionAI.Core.Constants = {
         "claude-opus4.8": "Opus 4.8",
         "claude-opus5": "Opus 5",
         "claude-haiku4.5": "Haiku 4.5",
+        "gpt-6-astra": "GPT-6 Astra",
         "gpt-5.6-sol": "GPT-5.6 Sol",
         "gpt-5.6-terra": "GPT-5.6 Terra",
         "gpt-5.6-luna": "GPT-5.6 Luna",
@@ -145,6 +148,7 @@ window.NotionAI.Core.Constants = {
         "claude-opus4.8": "✳️",
         "claude-opus5": "✳️",
         "claude-haiku4.5": "✳️",
+        "gpt-6-astra": "⚙",
         "gpt-5.6-sol": "⚙",
         "gpt-5.6-terra": "⚙",
         "gpt-5.6-luna": "⚙",

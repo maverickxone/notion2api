@@ -2,7 +2,7 @@
 
 > 本文档记录项目的完整状态、架构细节、开发历程和当前进展。  
 > 目标：阅读本文档后，即可全面掌握项目最新全貌。  
-> 最后更新：2026-07-25（模型列表同步至 22 个，新增 Claude Opus 5）
+> 最后更新：2026-09-06（模型列表同步至 23 个，新增 GPT-6 Astra）
 
 ---
 
@@ -16,7 +16,7 @@ Notion2API 是一个将 **Notion AI** 逆向封装为 **OpenAI 兼容 API** 的�
 
 - **OpenAI 兼容 API**：标准 `/v1/chat/completions` 端点，支持流式（SSE）和非流式响应
 - **三种运行模式**：Lite / Standard / Heavy，满足不同场景需求
-- **22 个 AI 模型**：Claude（含 Opus 5）、GPT-5.x、Gemini、Kimi、Grok、DeepSeek、GLM、Fable
+- **23 个 AI 模型**：Claude（含 Opus 5）、GPT-6 Astra、GPT-5.x、Gemini、Kimi、Grok、DeepSeek、GLM、Fable
 - **三层记忆系统**（Heavy 模式）：滑动窗口 + 压缩摘要 + 完整归档
 - **多账号负载均衡**：Round-Robin 轮询 + 冷却机制
 - **内置 Web UI**：Claude 风格界面，支持 Thinking 面板、Search 面板、对话管理
@@ -294,6 +294,7 @@ Notion 的流式响应是 NDJSON 格式，每行是一个 JSON 对象。解析�
 | claude-opus4.8 | ambrosia-tart-high | workflow | 强推理 Claude |
 | claude-opus5 | agave-flan | workflow | 最新 Claude Opus，最强推理 |
 | claude-haiku4.5 | anthropic-haiku-4.5 | workflow | Haiku 4.5 |
+| gpt-6-astra | orlando-quinn | workflow | GPT-6 Astra |
 | gpt-5.6-sol | orange-mousse | workflow | GPT-5.6 Sol |
 | gpt-5.6-terra | orchid-muffin | workflow | GPT-5.6 Terra |
 | gpt-5.6-luna | olive-jellyroll | workflow | GPT-5.6 Luna |
@@ -467,6 +468,7 @@ Notion 的流式响应是 NDJSON 格式，每行是一个 JSON 对象。解析�
 | 05-29 | `7b4439e` | 修复默认回退 Sonnet 模型的 bug |
 | 06-06 | `880357e` | 同步官方新模型 Grok 4.3、Grok Build 0.1、DeepSeek V4 Pro |
 | 07-25 | — | 同步官方新模型 Claude Opus 5（`claude-opus5` / `agave-flan`），模型总数 22 |
+| 09-06 | — | 新增 GPT-6 Astra（`gpt-6-astra` / `orlando-quinn`，codename 经 `getAvailableModels` 验证，活体调用通过），模型总数 23 |
 
 ---
 
@@ -584,7 +586,7 @@ uvicorn app.server:app --host 0.0.0.0 --port 8000
 **截至 2026-07**：
 
 **已完成**：
-- ✅ 模型列表已同步至 22 个，覆盖最新 Claude Opus 5（`agave-flan`）、GPT-5.6、Gemini、Kimi、GLM、Grok、DeepSeek 与 Fable 模型
+- ✅ 模型列表已同步至 23 个，新增 GPT-6 Astra（`orlando-quinn`），覆盖最新 Claude Opus 5（`agave-flan`）、GPT-5.6、Gemini、Kimi、GLM、Grok、DeepSeek 与 Fable 模型
 - ✅ 合并 PR #12：浏览器辅助登录 `login.py`（CDP，支持 Chrome/Edge，自动写入 accounts.json + .env）
 - ✅ 文档结构重组：README 双语重写、issues.md 中英合并、删除冗余 md 文件（ARCHITECTURE.md、DEPLOYMENT.md、accounts.README.md、CLAUDE.md、issues_CN.md）
 - ✅ 结构化错误提示系统（11 种错误码，前端红色错误卡片）
