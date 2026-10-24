@@ -26,11 +26,18 @@ NOTION_URL = os.getenv("NOTION_URL", "https://www.notion.so").rstrip("/")
 NOTION_DOMAIN = os.getenv("NOTION_DOMAIN", "www.notion.so").lstrip(".")
 BASE_URL = NOTION_URL
 AI_URL = f"{NOTION_URL}/ai"
-# CDP 页面识别用的主机名片段（自定义域名时填 NOTION_DOMAIN 即可）
-_NOTION_HOST_HINT = (
-    NOTION_DOMAIN.removeprefix("www.")
-    if NOTION_DOMAIN.startswith("www.")
-    else NOTION_DOMAIN
+# CDP 页面识别用的主机名片段（Notion 有多个官方域名，自定义域名时填 NOTION_DOMAIN 即可）
+_NOTION_HOST_HINTS = tuple(
+    dict.fromkeys(
+        hint
+        for hint in (
+            NOTION_DOMAIN.removeprefix("www.") if NOTION_DOMAIN.startswith("www.") else NOTION_DOMAIN,
+            "notion.so",
+            "notion.com",
+            "notion.site",
+        )
+        if hint
+    )
 )
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -154,6 +161,19 @@ def _find_chrome_executable() -> str | None:
             candidate = Path(root) / suffix
             if candidate.exists():
                 return str(candidate)
+
+    # macOS / Linux 默认安装位置
+    posix_paths = [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        str(Path.home() / "Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+        "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    ]
+    for path in posix_paths:
+        candidate = Path(path)
+        if candidate.exists():
+            return str(candidate)
     return None
 
 
@@ -205,6 +225,11 @@ class _CDPClient:
             pass
 
 
+def _looks_like_notion_url(url: str) -> bool:
+    text = str(url or "")
+    return any(hint in text for hint in _NOTION_HOST_HINTS)
+
+
 def _find_debug_target(port: int) -> dict[str, Any] | None:
     try:
         targets = _get_json(f"http://127.0.0.1:{port}/json/list")
@@ -215,13 +240,20 @@ def _find_debug_target(port: int) -> dict[str, Any] | None:
     if not isinstance(items, list):
         return None
 
+    # 优先返回真正的页面（page），避免命中 chrome:// 的 browser_ui 目标
+    for item in items:
+        if not isinstance(item, dict) or item.get("type") != "page":
+            continue
+        url = str(item.get("url") or "")
+        if _looks_like_notion_url(url) or "accounts.google.com" in url:
+            return item
     for item in items:
         if not isinstance(item, dict):
             continue
         url = str(item.get("url") or "")
-        if _NOTION_HOST_HINT in url or "accounts.google.com" in url:
+        if _looks_like_notion_url(url) or "accounts.google.com" in url:
             return item
-    return items[0] if items else None
+    return next((item for item in items if isinstance(item, dict) and item.get("type") == "page"), None)
 
 
 def _parse_cookie_string(cookie_string: str) -> dict[str, str]:
@@ -254,7 +286,7 @@ def _extract_cookies_from_cdp(port: int) -> dict[str, str]:
         try:
             current_url = client.call("Runtime.evaluate", {"expression": "location.href", "returnByValue": True})
             current_href = str(current_url.get("result", {}).get("value") or "") if isinstance(current_url, dict) else ""
-            if _NOTION_HOST_HINT not in current_href:
+            if not _looks_like_notion_url(current_href):
                 client.call("Page.navigate", {"url": AI_URL})
                 time.sleep(2)
         except Exception:
@@ -274,17 +306,26 @@ def _extract_cookies_from_cdp(port: int) -> dict[str, str]:
         except Exception:
             pass
 
+        def _collect(cookie_items: Any) -> None:
+            if not isinstance(cookie_items, list):
+                return
+            for item in cookie_items:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name") or "").strip()
+                value = str(item.get("value") or "").strip()
+                if name:
+                    cookies[name] = value
+
         cookie_result = client.call("Network.getCookies", {"urls": [BASE_URL, AI_URL]})
-        cookies_list = cookie_result.get("cookies", [])
-        if not isinstance(cookies_list, list):
-            return cookies
-        for item in cookies_list:
-            if not isinstance(item, dict):
-                continue
-            name = str(item.get("name") or "").strip()
-            value = str(item.get("value") or "").strip()
-            if name:
-                cookies[name] = value
+        _collect(cookie_result.get("cookies", []))
+
+        # Notion 已迁移到 app.notion.com：只按 BASE_URL 取会漏掉 .notion.com 的 cookie，兜底读全量
+        if not cookies.get("token_v2"):
+            try:
+                _collect(client.call("Network.getAllCookies").get("cookies", []))
+            except Exception:
+                pass
         return cookies
     finally:
         client.close()
